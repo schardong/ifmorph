@@ -12,10 +12,13 @@ package:
 	@echo "Package created at: dist.tbz"
 
 clean:
-#	@rm -Rf pretrained/*
-#	@rm -Rf results/*
 	@rm -Rf __pycache__
 	@rm -Rf ifmorph/__pycache__
+
+nuke: clean
+	@rm -Rf pretrained
+	@rm -Rf results
+	@rm -Rf data
 
 train_initial_states: data/frll
 	@python create-initial-states.py --nsteps 1000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll/001_03.jpg data/frll/002_03.jpg
@@ -43,3 +46,6 @@ data/frll:
 	@mv neutral_front/* data/frll/
 	@rm -Rf __MACOSX neutral_front.zip
 	@echo "Dataset downloaded"
+
+data/frll_cropped: data/frll
+	@python align.py --just-crop --output-size 1350 --n-tasks 4 $< $@
