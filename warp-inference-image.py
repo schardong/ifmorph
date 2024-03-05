@@ -13,7 +13,7 @@ import torch
 import yaml
 from ifmorph.dataset import check_network_type
 from ifmorph.model import from_pth
-from ifmorph.util import get_grid, get_silhouette_lm, blend_frames, warped_shapenet_inference
+from ifmorph.util import get_grid, blend_frames, warped_shapenet_inference
 
 WITH_MRNET = True
 try:
