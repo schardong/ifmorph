@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<html>
+
+<link href='https://fonts.googleapis.com/css?family=Titillium+Web:400,600,400italic,600italic,300,300italic' rel='stylesheet' type='text/css'>
+<head>
+    <title>Neural Implicit Morphing of Face Images</title>
+    <meta property="og:description" content="Preaching-AI"/>
+    <meta property="og:image" itemprop="image" content="https://dsilvavinicius.github.io/nise/assets/representative.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Icons" rel="stylesheet">
+    <link rel='stylesheet' type='text/css' href='styles.css'/>
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:creator" content="@dsilvavinicius">
+    <meta name="twitter:title" content="Neural Implicit Morphing of Face Images">
+    <meta name="twitter:description" content="Neural Implicit Morphing of Face Images is a novel method to create morphing between two face images.">
+    <meta name="twitter:image" content="https://dsilvavinicius.github.io/nise/assets/representative.jpg">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+
+<body>
+<div class="container">
+    <div class="paper-title">
+        <h1>Neural Implicit Morphing of Face Images</h1>
+    </div>
+
+    <div id="authors">
+        <div class="author-row">
+            <div class="col-4 text-center"><a href="https://schardong.github.io/">Guilherme Schardong</a><sup>1</sup></div>
+            <div class="col-4 text-center"><a href="https://sites.google.com/site/tiagonovellodebrito">Tiago Novello</a><sup>2</sup></div>
+            <div class="col-4 text-center"><a href="https://hallisonpaz.com.br/">Hallison Paz</a><sup>2</sup></div>
+            <div class="col-4 text-center"><a href="https://visteam.isr.uc.pt/team/iurii-medvedev">Iurii Medvedev</a><sup>1</sup></div>
+            <div class="col-3 text-center"><a href="https://dsilvavinicius.github.io">Vinícius da Silva</a><sup>3</sup></div>
+            <div class="col-3 text-center"><a href="https://lvelho.impa.br/">Luiz Velho</a><sup>2</sup></div>
+            <div class="col-3 text-center"><a href="https://visteam.isr.uc.pt/team/nuno-goncalves">Nuno Gonçalves</a><sup>1</sup></div>
+        </div>
+
+        <div class="affil-row">
+            <div class="col-3 text-center"><sup>1</sup>University of Coimbra</div>
+            <div class="col-3 text-center"><sup>2</sup>IMPA</div>
+            <div class="col-3 text-center"><sup>3</sup>PUC-Rio</div>
+        </div>
+
+        <div style="clear: both">
+            <div class="paper-btn-parent">
+                <a class="paper-btn" href="https://arxiv.org/abs/2308.13888">
+                    <span class="material-icons"> description </span>
+                    Paper
+                </a>
+                <a class="paper-btn" href="index.html">
+                    <span class="material-icons"> code </span>
+                    Code (soon)
+                </a>
+                <!--<a class="paper-btn" href="https://github.com/dsilvavinicius/nise">
+                    <span class="material-icons"> code </span>
+                    Code
+                </a>-->
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <section id="teaser-videos">
+        <!--
+        <figure style="width: 33%; float: left">
+            <p class="caption_bold">
+                Coarse
+            </p>
+        </figure>
+
+        <figure style="width: 33%; float: left">
+            <p class="caption_bold">
+                Neural Implicit Normal Mapping
+            </p>
+        </figure>
+
+        <figure style="width: 33%; float: left">
+            <p class="caption_bold">
+                Baseline
+            </p>
+        </figure>
+        -->
+
+        <figure style="width: 50%; float: left">
+            <video class="centered" width="100%" autoplay muted loop playsinline>
+                <source src="assets/teaser_improved_twitter.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </figure>
+        <figure style="width: 50%; float: right">
+            <video class="centered" width="100%" autoplay muted loop playsinline>
+                <source src="assets/women_teaser.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </figure>
+
+        <figure style="width: 100%; float: left">
+            <p class="caption_justify">
+                Results of morphings using our approach. On the left, a morphing between an image of Yann Lecun and an image of Geoffrey Hinton, also as a tribute for all the researchers that helped establish the field. On the right, a morphing between two images in the FRLL-Morphs dataset. Our approach takes landmarks into consideration, resulting in an aligment of the most important face features during the entire morphing process.
+            </p>
+        </figure>
+    </section>
+
+    <section id="news">
+        <h2>News</h2>
+        <hr>
+        <div class="row">
+            <div><span class="material-icons"> description </span> [Feb 26th 2024] Paper accepted to #CVPR24.
+                <blockquote class="twitter-tweet"><p lang="en" dir="ltr">📢New <a href="https://twitter.com/hashtag/CVPR2024?src=hash&amp;ref_src=twsrc%5Etfw">#CVPR2024</a> paper: Neural Implicit Morphing of Face Images📢! The video bellow is a result of our approach and a tribute to pioneer scientists that helped establish the field, such as <a href="https://twitter.com/ylecun?ref_src=twsrc%5Etfw">@ylecun</a> and <a href="https://twitter.com/geoffreyhinton?ref_src=twsrc%5Etfw">@geoffreyhinton</a>. <a href="https://t.co/xyY0xQy5aS">pic.twitter.com/xyY0xQy5aS</a></p>&mdash; Vinícius da Silva (@dsilvavinicius) <a href="https://twitter.com/dsilvavinicius/status/1763684693923271039?ref_src=twsrc%5Etfw">March 1, 2024</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+            <div><span class="material-icons"> description </span> [Mar 2nd 2024] Yann Lecun mentioned this work on X.</div>
+                <blockquote class="twitter-tweet"><p lang="en" dir="ltr">Geoffrann LeCunton.<br>This is not what they call a mixture of experts. <a href="https://t.co/zUz32RYq3F">https://t.co/zUz32RYq3F</a></p>&mdash; Yann LeCun (@ylecun) <a href="https://twitter.com/ylecun/status/1764085328611037273?ref_src=twsrc%5Etfw">March 3, 2024</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+            <div><span class="material-icons"> description </span> [Mar 06th 2024] Page online.</div> 
+        </div>
+    </section>
+
+    <section id="Capabilities" style="text-align: justify;"/>
+        <h2>Capabilities</h2>
+        <hr>
+        <p> The approach supports subjects with different facial expressions. In the example below the target is smiling, but the source is not.</p>
+        <figure style="width: 100%; float: left">
+            <img src="assets/morph-expression.png">
+        </figure>
+
+        <p>The faces may also be in different poses. In this example, the target is in a 45º profile and we morph until the middle between source and target. Notice that our approach is the only one where the eyes are not looking at the camera, which would be the expected behavior.</p>
+        <figure style="width: 100%; float: left">
+            <img src="assets/morph-pose.png">
+        </figure>
+
+        <p>It also deals with occlusion and faces in the wild. In this example the eyes are occluded by the glasses.</p>
+        <figure style="width: 100%; float: left">
+            <img src="assets/morph-oclusion.png">
+        </figure>
+
+        <p>It is possible to transfer features between faces.</p>
+        <figure style="width: 100%; float: left">
+            <img src="assets/transfer.png">
+        </figure>
+
+        <p>We use the Poisson blending to define a boundary value problem to selectively blend parts of the target and source images. The example shows different cloning strategies of the half-space region of I_1 into I_0.</p>
+        <figure style="width: 100%; float: left">
+            <img src="assets/blending.png">
+        </figure>
+
+        <p>Our approach may also be used to align images for generative morphing using Diffusion Autoencoders (diffAE). Line 1 presents a morphing between two faces using our neural warping + diffAE. Line 2 shows the results of diffAE using no alignment.</p>
+        <figure style="width: 100%; float: left">
+            <img src="assets/diffusion.jpg">
+        </figure>
+
+    </section>
+
+    <section id="Method">
+        <h2>Method</h2>
+        <hr>
+
+        <p>To define the morphing, we disentangle the spatial deformation (warping), used to align the corresponding features along the time, from the blending of the resulting warped images. We parameterize the warping with a coordinate net and employ the thin-plate energy to force the transformations to minimize deformation. This is essential, because just applying a linear transformation may result in ghosting. See this comparison with OpenCV.</p>
+        <figure style="width: 80%; float: center">
+            <img src="assets/opencv.png">
+        </figure>
+
+        After the warping, we blend the warped target images. Our approach supports linear, Poisson, and generative blending.
+
+    </section>
+
+    <section id="paper">
+        <h2>Paper</h2>
+        <hr>
+        <div class="flex-row">
+            <div style="box-sizing: border-box; padding: 16px; margin: auto;">
+                <a href="https://www.visgraf.impa.br/morph/Warping_and_Morphing_of_Images_using_Neural_Networks_LR.pdf"><img class="screenshot" src="assets/paper-thumbnail.png"></a>
+            </div>
+            <div style="width: 60%">
+                <p><b>Neural Implicit Morphing of Face Images</b></p>
+                <p>Guilherme Schardong, Tiago Novello, Hallison Paz, Iurii Medvedev, Vinícius da Silva, Luiz Velho, and Nuno Gonçalves.</p>
+
+                <div><span class="material-icons"> description </span><a href="https://www.visgraf.impa.br/morph/Warping_and_Morphing_of_Images_using_Neural_Networks_LR.pdf"> Paper preprint (PDF)</a></div>
+                <div><span class="material-icons"> description </span><a href="https://arxiv.org/abs/2308.13888"> Arxiv</a></div>
+                <div><span class="material-icons"> insert_comment </span><a href="assets/schardong2024neural.bib"> BibTeX</a></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="bibtex">
+        <h2>Citation</h2>
+        <hr>
+        <pre style="background-color:#121212;"><code>@inproceedings{schardong2024neural,
+    title = {Neural Implicit Morphing of Face Images},
+    author = {Schardong, Guilherme and Novello, Tiago and Paz, Hallison and Medvedev, Iurii and Silva, Vin\'icius da and Velho, Luiz and Gon\calves, Nuno},
+    booktitle={Proceedings of the IEEE / CVF Computer Vision and Pattern Recognition Conference},
+    year = {2024}
+} 
+
+</code></pre>
+    </section>
+
+    <section id="acknowledgements">
+        <h2>Acknowledgements</h2>
+        <hr>
+        <div class="row">
+            <p>
+            We would like to thank ...
+            <!--<a href="https://tovacinni.github.io">Towaki Takikawa</a>,
+            <a href="https://joeylitalien.github.io">Joey Litalien</a>,
+            <a href="https://kangxue.org/">Kangxue Yin</a>,
+            <a href="https://scholar.google.de/citations?user=rFd-DiAAAAAJ">Karsten Kreis</a>,
+            <a href="https://research.nvidia.com/person/charles-loop">Charles Loop</a>,
+            <a href="http://www.cim.mcgill.ca/~derek/">Derek Nowrouzezahrai</a>,
+            <a href="https://www.cs.toronto.edu/~jacobson/">Alec Jacobson</a>,
+            <a href="https://casual-effects.com/">Morgan McGuire</a> and
+            <a href="https://www.cs.toronto.edu/~fidler/">Sanja Fidler</a>
+            for licensing the code of the paper <a href="https://nv-tlabs.github.io/nglod/">Neural Geometric Level of Detail:
+                Real-time Rendering with Implicit 3D Surfaces</a> and project page under the <a href=https://opensource.org/licenses/MIT>MIT License</a>. This website is based on that page.!-->
+            <br/>
+            <br/>
+            <em>We also thank the ... <!--<a href="https://graphics.stanford.edu">Stanford Computer Graphics Laboratory</a> for the Bunny, Dragon, Armadillo, and Happy Buddha, acquired through the <a href="http://graphics.stanford.edu/data/3Dscanrep/">Stanford 3D scan repository</a>. Finally, we thank <a href="https://www.cs.cmu.edu/~kmcrane/Projects/ModelRepository/">Keenan Crane</a> for the Spot and Bob models.!-->
+            </p>
+        </div>
+    </section>
+</div>
+</body>
+
+</html>

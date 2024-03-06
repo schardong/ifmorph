@@ -1,0 +1,276 @@
+body {
+	font-family: "Titillium Web", "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+	font-weight: 300;
+	font-size: 17px;
+	margin-left: auto;
+	margin-right: auto;
+	max-width: 900px;
+    width: 100%;
+	background-color: #121212;
+}
+
+@media (max-width: 768px) {
+    body {
+        font-size: 15px;
+    }
+}
+
+h1 {
+	font-weight:300;
+	line-height: 0.0em;
+	color: #f0ece2;
+}
+h2 {
+	font-size: 1.75em;
+}
+a:link,a:visited {
+	color: #0088ff;
+	text-decoration: none;
+}
+a:hover {
+	color: #0065b3;
+}
+h1, h2, h3 {
+	text-align: center;
+}
+h1 {
+	font-size: 40px;
+	font-weight: 500;
+}
+h2, h3 {
+	font-weight: 400;
+	margin: 16px 0px 4px 0px;
+}
+.paper-title {
+	padding: 16px 0px 16px 0px;
+	text-align: center;
+}
+.logo {
+    width: 350px; /* makes the logo the same height as the text line */
+    height: auto; /* keeps the original aspect ratio of the logo */
+	margin-bottom: -40px;
+}
+.language-selector {
+	text-align: center;
+	color: #f0ece2;
+	font-size: 14px;
+	padding: 0px 0px 40px 0px;
+}
+section {
+	margin: 32px 10px 32px 10px;
+	text-align: justify;
+	clear: both;
+	color: #f0ece2;
+	font-size: 18px;
+}
+.col-5 {
+	 width: 20%;
+	 float: left;
+}
+.col-4 {
+	 width: 25%;
+	 float: left;
+}
+.col-3 {
+	 width: 33%;
+	 float: left;
+}
+.col-2 {
+	 width: 50%;
+	 float: left;
+}
+.row, .author-row, .affil-row {
+	 overflow: auto;
+	 color: #f0ece2;
+}
+.author-row, .affil-row {
+	font-size: 18px;
+}
+.row {
+	margin: 16px 0px 16px 0px;
+}
+.authors {
+	font-size: 18px;
+}
+.affil-row {
+	margin-top: 16px;
+}
+.teaser {
+	max-width: 100%;
+}
+.text-center {
+	text-align: center;
+}
+.screenshot {
+	width: 256px;
+	border: 1px solid #ddd;
+}
+.screenshot-lg {
+	width: 512px;
+	border: 1px solid #ddd;
+	display: block;
+  	margin-left: auto;
+  	margin-right: auto;
+}
+.screenshot-el {
+	margin-bottom: 16px;
+}
+hr {
+	height: 1px;
+	border: 0;
+	border-top: 1px solid #ddd;
+	margin: 0;
+}
+.material-icons {
+	vertical-align: -6px;
+}
+p {
+	line-height: 1.25em;
+}
+.caption_justify {
+	font-size: 16px;
+	/*font-style: italic;*/
+	/*color: #666;*/
+	text-align: justify;
+	margin-top: 0px;
+	margin-bottom: 64px;
+}
+.caption {
+	font-size: 16px;
+	/*font-style: italic;*/
+	/*color: #666;*/
+	text-align: center;
+	margin-top: 8px;
+	margin-bottom: 64px;
+}
+.caption_inline {
+	font-size: 16px;
+	/*font-style: italic;*/
+	/*color: #666;*/
+	text-align: center;
+	margin-top: 8px;
+	margin-bottom: 0px;
+}
+.caption_bold {
+	font-size: 16px;
+	/*font-style: italic;*/
+	/*color: #666;*/
+	text-align: center;
+	margin-top: 0px;
+	margin-bottom: 0px;
+	font-weight: bold;
+}
+video {
+	display: block;
+	margin: auto;
+}
+figure {
+	display: block;
+	margin: auto;
+	margin-top: 10px;
+	margin-bottom: 10px;
+}
+#bibtex pre {
+	font-size: 14px;
+	background-color: #eee;
+	padding: 16px;
+}
+.blue {
+	color: #2c82c9;
+	font-weight: bold;
+}
+.orange {
+	color: #d35400;
+	font-weight: bold;
+}
+.flex-row {
+	display: flex;
+	flex-flow: row wrap;
+	justify-content: space-around;
+	padding: 0;
+	margin: 0;
+	list-style: none;
+}
+.paper-btn {
+  position: relative;
+  text-align: center;
+
+  display: inline-block;
+  margin: 8px;
+  padding: 8px 8px;
+
+  border-width: 0;
+  outline: none;
+  border-radius: 2px;
+
+  background-color: #1367a7;
+  color: #ecf0f1 !important;
+  font-size: 20px;
+  /*width: 130px;*/
+  font-weight: 600;
+}
+.paper-btn-parent {
+	display: flex;
+	justify-content: center;
+	margin: 16px 0px;
+}
+.paper-btn:hover {
+	opacity: 0.85;
+}
+.container {
+	margin-left: auto;
+	margin-right: auto;
+	padding-left: 16px;
+	padding-right: 16px;
+}
+.venue {
+	color: #1367a7;
+}
+.fig_overview, .fig_lod_cond {
+	margin: 0;
+	padding: 0;
+	display: block;
+	text-align: center;
+}
+.fig_overview {
+	width: 50%;
+}
+.fig_lod_cond {
+	width: 43.5%;
+}
+.overview_img {
+	width: 100%;
+}
+mark {
+	background-color: #121212;
+	font-style: italic;
+	font-weight: bold;
+	color: #f0ece2;
+}
+mark.red {
+    color:#ff0000;
+}
+
+mark.blue {
+    color:#1367a7;
+}
+
+mark.black {
+    color: gray;
+}
+sub {
+	font-style: italic;
+	font-weight: bold;
+}
+sub.red {
+	color:#ff0000;
+}
+sub.blue {
+    color:#1367a7;
+}
+sub.black {
+    color:#000000;
+}
+code {
+	background-color: #121212;
+}

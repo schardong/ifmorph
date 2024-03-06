@@ -1,0 +1,39 @@
+.title {
+  text-align: left;
+  margin-left: 40px auto;
+  border-bottom-style: solid;
+  border-bottom-color: lightgray;
+}
+
+body {
+    margin: 40px auto;
+    max-width: 1650px;
+    line-height: 1.6;
+    font-size: 16px;
+    color: #444;
+    padding: 0 10px;
+    font-family: "Ubuntu", serif;
+}
+
+h1,h2,h3 {
+    line-height: 1.2;
+    font-weight: normal;
+}
+
+#contact {
+  position: absolute;
+  top: 2.25em;
+  right: 10%;
+}
+
+#pgpkey {
+    position: absolute;
+    top: 3.5em;
+    right: 10%;
+}
+
+@media all and (min-width: 700px) {
+    .hide-large {
+        display: none;
+    }
+}
