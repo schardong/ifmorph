@@ -58,6 +58,7 @@ h2, h3 {
 }
 section {
 	margin: 32px 10px 32px 10px;
+	width: 100%;
 	text-align: justify;
 	clear: both;
 	color: #f0ece2;

@@ -121,32 +121,32 @@
         <h2>Capabilities</h2>
         <hr>
         <p> The approach supports subjects with different facial expressions. In the example below the target is smiling, but the source is not.</p>
-        <figure>
+        <figure style="width: 100%; float: left">
             <img src="assets/morph-expression.png">
         </figure>
 
         <p>The faces may also be in different poses. In this example, the target is in a 45º profile and we morph until the middle between source and target. Notice that our approach is the only one where the eyes are not looking at the camera, which would be the expected behavior.</p>
-        <figure>
+        <figure style="width: 100%; float: left">
             <img src="assets/morph-pose.png">
         </figure>
 
         <p>It also deals with occlusion and faces in the wild. In this example the eyes are occluded by the glasses.</p>
-        <figure>
+        <figure style="width: 100%; float: left">
             <img src="assets/morph-oclusion.png">
         </figure>
 
         <p>It is possible to transfer features between faces.</p>
-        <figure>
+        <figure style="width: 100%; float: left">
             <img src="assets/transfer.png">
         </figure>
 
         <p>We use the Poisson blending to define a boundary value problem to selectively blend parts of the target and source images. The example shows different cloning strategies of the half-space region of I_1 into I_0.</p>
-        <figure">
+        <figure style="width: 100%; float: left">
             <img src="assets/blending.png">
         </figure>
 
         <p>Our approach may also be used to align images for generative morphing using Diffusion Autoencoders (diffAE). Line 1 presents a morphing between two faces using our neural warping + diffAE. Line 2 shows the results of diffAE using no alignment.</p>
-        <figure">
+        <figure style="width: 100%; float: left">
             <img src="assets/diffusion.jpg">
         </figure>
 
