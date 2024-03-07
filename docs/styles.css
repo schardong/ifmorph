@@ -275,3 +275,7 @@ sub.black {
 code {
 	background-color: #121212;
 }
+
+.quote {
+    text-align:center;
+}
