@@ -277,6 +277,14 @@ code {
 }
 
 .quote {
-	width: 100%;
-    margin: auto;
+	display: flex;
+	justify-content: center;
+}
+.news_highlight_date {
+	font-weight: bold;
+	color: #D32F2F;
+}
+.news_highlight {
+	font-weight: bold;
+	color: #1976D2;
 }
