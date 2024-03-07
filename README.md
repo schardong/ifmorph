@@ -2,7 +2,7 @@
 [Guilherme Schardong [1]](https://schardong.github.io/),
 [Tiago Novello [2]](https://sites.google.com/site/tiagonovellodebrito),
 [Hallison Paz [2]](https://hallisonpaz.com.br/)
-[Iurii Medvedev [1]]()
+[Iurii Medvedev [1]](https://visteam.isr.uc.pt/team/iurii-medvedev)
 [Vinícius da Silva [2]](https://dsilvavinicius.github.io/),
 [Luiz Velho [1]](https://lvelho.impa.br/)
 [Nuno Gonçalves [3]](https://home.deec.uc.pt/~nunogon/)
