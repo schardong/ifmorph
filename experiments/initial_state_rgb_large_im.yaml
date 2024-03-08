@@ -1,0 +1,12 @@
+network:
+  hidden_layers: [256, 256, 256]
+  omega_0: 100
+  omega_w: 100
+  in_channels: 2
+  out_channels: 3
+
+optimizer:
+  lr: 0.0001
+
+training:
+  n_steps: 10000
