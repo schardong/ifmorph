@@ -109,7 +109,7 @@ Note that `data/frll_neutral_front_cropped` is not in the repository as well. Yo
 This will store all images in `data/frll_neutral_front_cropped` in the `pretrained/frll_neutral_front_croppped` folder. Afterwards, run the script to detect the landmarks, followed by the script to create the experiment configuration files:
 
 ```{sh}
-python detect_landmarks.py pretrained/frll_neutral_front_cropped/
+python detect_landmarks.py -o pretrained/frll_neutral_front_cropped/ pretrained/frll_neutral_front_cropped/*.pth
 python standalone/create_experiment_files.py data/pairs_for_morphing_full.txt pretrained/frll_neutral_front_cropped/ experiments/pairwise_dlib
 ```
 
