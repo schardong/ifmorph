@@ -6,9 +6,8 @@ install:
 	@pip install -r requirements.txt
 	@pip install -e .
 
-package:
-	@rm -Rf ifmorph/__pycache__/
-	@tar -cjf dist.tbz ifmorph/ warp-train.py warp-inference-vid.py warp-inference-image.py setup.py requirements.txt README.md create-initial-states.py align.py Makefile download_data.sh
+package: clean
+	@tar -cjf dist.tbz ifmorph/ warp-train.py warp-inference-vid.py warp-inference-image.py setup.py requirements.txt README.md LICENSE create-initial-states.py align.py Makefile download_data.sh
 	@echo "Package created at: dist.tbz"
 
 clean:
@@ -21,7 +20,7 @@ nuke: clean
 	@rm -Rf data
 
 train_initial_states: data/frll_neutral_front
-	@python create-initial-states.py --nsteps 5000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll/001_03.jpg data/frll/002_03.jpg
+	@python create-initial-states.py --nsteps 5000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
 
 train_warp: results/001_002-baseline/weights.pth
 	@echo "FRLL 001->002 warp trained"
