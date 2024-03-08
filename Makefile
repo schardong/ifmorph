@@ -38,7 +38,7 @@ landmark_models/shape_predictor_68_face_landmarks_GTX.dat:
 	@rm -Rf shape_predictor_68_face_landmarks_GTX.dat.bz2
 	@echo "Done"
 
-data/frll:
+data/frll_neutral_front:
 	@echo "Downloading the FRLL dataset"
 	@curl --location --remote-header-name --remote-name https://figshare.com/ndownloader/files/8541961
 	@unzip neutral_front.zip
@@ -47,5 +47,21 @@ data/frll:
 	@rm -Rf __MACOSX neutral_front.zip
 	@echo "Dataset downloaded"
 
+pretrained/frll_neutral_front:
+	@mkdir -p $@
+	@./download_data.sh 1QYoprK2bycXHItSkx9H8JfMGz48B9a3N frll_neutral_front.tar.bz2
+	@tar -xjf frll_neutral_front.tar.bz2
+	@mv frll_neutral_front/*.pth $@
+	@rm -Rf frll_neutral_front.tar.bz2 frll_neutral_front/
+	@rm -f cookie
+
 data/frll_cropped: data/frll
 	@python align.py --just-crop --output-size 1350 --n-tasks 4 $< $@
+
+pretrained/frll_cropped:
+	@mkdir -p $@
+	@./download_data.sh 1guMg5ablWDQgaSfr5sFwScPWa-gm5Vsz frll_cropped.tar.bz2
+	@tar -xjf frll_cropped.tar.bz2
+	@mv frll_cropped/*.pth $@
+	@rm -Rf frll_cropped.tar.bz2 frll_cropped/
+	@rm -f cookie
