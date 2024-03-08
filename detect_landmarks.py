@@ -17,7 +17,13 @@ if __name__ == "__main__":
         " encoded as neural networks."
     )
     parser.add_argument(
-        "inputdir", help="Path to the PTH files representing the face images."
+        "models", nargs="+", help="Path to the PyTorch files representing"
+        " face images."
+    )
+    parser.add_argument(
+        "--outputdir", "-o", default=".", help="Path to the output directory"
+        " where the landmark files will be stored. It will be created if it"
+        " does not exists."
     )
     parser.add_argument(
         "--device", "-d", default="cuda:0", help="Device to run the inference."
@@ -50,9 +56,11 @@ if __name__ == "__main__":
     device = torch.device(devstr)
     dims = [int(d) for d in args.dims.split(",")]
 
-    modelnames = [osp.join(args.inputdir, f) for f in os.listdir(args.inputdir) if f.endswith(".pth")]
+    if not osp.exists(args.outputdir):
+        os.makedirs(args.outputdir)
+
     lmdict = {}
-    for modelname in sorted(modelnames):
+    for modelname in args.models:
         faceim = from_pth(modelname, device=device).eval()
         img = image_inference(faceim, dims, device=device)
         lms = get_landmarks_dlib(img)
@@ -60,12 +68,13 @@ if __name__ == "__main__":
         lmdict[key] = lms
 
         if args.saveim:
+            imname = osp.splitext(osp.split(modelname)[-1])[0] + ".png"
             if args.plot_landmarks:
                 img[lms[:, 0], lms[:, 1], :] = (0, 255, 0)
             cv2.imwrite(
-                modelname[:-3] + "png",
+                osp.join(args.outputdir, imname),
                 cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             )
 
     for lmname, lm in lmdict.items():
-        lm.dump(osp.join(args.inputdir, lmname) + ".dat")
+        lm.dump(osp.join(args.outputdir, lmname) + ".dat")
