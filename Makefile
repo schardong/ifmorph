@@ -7,8 +7,8 @@ install:
 	@pip install -e .
 
 package:
-	@rm -Rf niif/__pycache__/
-	@tar -cjf dist.tbz niif/ warp-train.py warp-inference-vid.py warp-inference-image.py setup.py requirements.txt README.md create-initial-states.py align.py
+	@rm -Rf ifmorph/__pycache__/
+	@tar -cjf dist.tbz ifmorph/ warp-train.py warp-inference-vid.py warp-inference-image.py setup.py requirements.txt README.md create-initial-states.py align.py Makefile download_data.sh
 	@echo "Package created at: dist.tbz"
 
 clean:
@@ -20,14 +20,14 @@ nuke: clean
 	@rm -Rf results
 	@rm -Rf data
 
-train_initial_states: data/frll
-	@python create-initial-states.py --nsteps 1000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll/001_03.jpg data/frll/002_03.jpg
+train_initial_states: data/frll_neutral_front
+	@python create-initial-states.py --nsteps 5000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll/001_03.jpg data/frll/002_03.jpg
 
-train_warp: results/fm_frll-001-002/weigths.pth
+train_warp: results/001_002-baseline/weights.pth
 	@echo "FRLL 001->002 warp trained"
 
-results/fm_frll-001-002/weights.pth: pretrained/001_03.pth pretrained/002_03.pth
-	@python warp-train.py experiments/tem/fm_frll-001-002.yaml
+results/001_002-baseline/weights.pth: pretrained/frll_neutral_front
+	@python warp-train.py --no-ui experiments/001_002-baseline.yaml
 
 landmark_models/shape_predictor_68_face_landmarks_GTX.dat:
 	@echo "Downloading DLib GTX 68 landmarks detection model"
@@ -42,9 +42,9 @@ data/frll_neutral_front:
 	@echo "Downloading the FRLL dataset"
 	@curl --location --remote-header-name --remote-name https://figshare.com/ndownloader/files/8541961
 	@unzip neutral_front.zip
-	@mkdir -p data/frll
-	@mv neutral_front/* data/frll/
-	@rm -Rf __MACOSX neutral_front.zip
+	@mkdir -p $@
+	@mv neutral_front/* $@
+	@rm -Rf __MACOSX neutral_front.zip neutral_front/
 	@echo "Dataset downloaded"
 
 pretrained/frll_neutral_front:
