@@ -34,16 +34,16 @@ Most of the functions are available through the `ifmorph` module. It contains th
 On the repository root, we stored most of the experiment scripts needed to reproduce our work. We list them below for completeness:
 * `align.py` - crop/resize/alignment script for the face images
 * `create-initial-states.py` - trains the networks that encode the initial states (faces) before the warping proper
+* `detect_landmarks.py` - given a list of images, detects the facial landmarks using DLib and stores them as `.DAT` files
 * `mark-warp-points.py` - marks the landmark points for warping. Optionally, allows their editing via a simple UI
-* `morph-train.py` - trains a network for morphing two initial states and a (neural) warping
+* `morph-train.py` - trains a network for morphing(blending) two initial states and a (neural) warping (_very volatile_)
 * `warp-inference-image.py` - runs the inference of a pretrained face warping network, outputs an image, or series of images
 * `warp-inference-vid.py` - runs the inference of a pretrained face warping network, outputs a video
-* `warp-no-time-train.py` - TBD
 * `warp-train.py` - trains a network for face landmark warping between two initial states
 
 Inside the `standalone` folder, we've stored scripts that are related, but not necessarily essential to run the experiments. These are:
 * `create_experiment_files.py` - given a list of pairs, image paths and landmarks, creates the corresponding experiment files
-* `detect_landmarks.py` - given a list of images, detects the facial landmarks using DLib and stores them as `.DAT` files
+
 
 ### Setup and sample run
 For this setup, we assume that the Python version is >= 3.10.0 and CUDA Toolkit is 11.6. We also tested with Python 3.9.0 and CUDA 11.7 everything worked as well. Note that for both PyEnv and Conda **we assume that all commands are typed in the root of the repository**.
