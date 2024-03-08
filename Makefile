@@ -54,10 +54,10 @@ pretrained/frll_neutral_front:
 	@rm -Rf frll_neutral_front.tar.bz2 frll_neutral_front/
 	@rm -f cookie
 
-data/frll_cropped: data/frll
+data/frll_neutral_front_cropped: data/frll_neutral_front
 	@python align.py --just-crop --output-size 1350 --n-tasks 4 $< $@
 
-pretrained/frll_cropped:
+pretrained/frll_neutral_front_cropped:
 	@mkdir -p $@
 	@./download_data.sh 1guMg5ablWDQgaSfr5sFwScPWa-gm5Vsz frll_cropped.tar.bz2
 	@tar -xjf frll_cropped.tar.bz2

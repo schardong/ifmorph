@@ -41,9 +41,8 @@ On the repository root, we stored most of the experiment scripts needed to repro
 * `warp-inference-vid.py` - runs the inference of a pretrained face warping network, outputs a video
 * `warp-train.py` - trains a network for face landmark warping between two initial states
 
-Inside the `standalone` folder, we've stored scripts that are related, but not necessarily essential to run the experiments. These are:
+Inside the `scripts` folder, we've stored scripts that are related, but not necessarily essential to run the experiments. These are:
 * `create_experiment_files.py` - given a list of pairs, image paths and landmarks, creates the corresponding experiment files
-
 
 ### Setup and sample run
 For this setup, we assume that the Python version is >= 3.10.0 and CUDA Toolkit is 11.6. We also tested with Python 3.9.0 and CUDA 11.7 everything worked as well. Note that for both PyEnv and Conda **we assume that all commands are typed in the root of the repository**.
@@ -79,7 +78,7 @@ pip install -e .
 ```
 
 #### Dataset
-Download the [Face Research Lab London](https://figshare.com/articles/dataset/Face_Research_Lab_London_Set/5047666) dataset from their website. If you use makefiles, we provide a rule to download and extract the dataset to the correct location (see the `Makefile`, rule `data/frll`). Any image may be used, as long as it contains a face. Afterwards, just create an implicit representation by running the `create-initial-states.py` script (an example is provided below).
+Download the [Face Research Lab London](https://figshare.com/articles/dataset/Face_Research_Lab_London_Set/5047666) dataset from their website. If you use makefiles, we provide a rule to download and extract the dataset to the correct location (see the `Makefile`, rule `data/frll_neutral_front`). Any image may be used, as long as it contains a face. Afterwards, just create an implicit representation by running the `create-initial-states.py` script (an example is provided below).
 
 An optional pre-processing step is implemented in a modified version of the `align.py` script, provided by the [DiffAE](https://github.com/phizaz/diffae) authors (which they extracted from the FFHQ pre-processing script) to crop and resize the images. We modified it to allow for a "non-alignment", thus the images are cropped and resized, but not necessarilly aligned. For the quantitative comparisons, the images need to be pre-processed by the `align.py` script, since the other models assume the face to occupy a central (and large) part of the image.
 
@@ -91,27 +90,27 @@ An optional pre-processing step is implemented in a modified version of the `ali
 In an Ubuntu 22.04 system, the commands below should do it. Note that the optional parameters have default values, thus you don't need to specify them. We do it here for some of them to demonstrate possible values:
 
 ```{sh}
-(OPTIONAL) python align.py --just-crop --output-size 1024 --n-tasks 4 data/frll/ data/frll_cropped
-python create-initial-states.py --nsteps 1000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll_cropped/001_03.jpg data/frll_cropped/002_03.jpg
-python warp-train.py experiments/001-002.yaml
+(OPTIONAL) python align.py --just-crop --output-size 1024 --n-tasks 4 data/frll/ data/frll_neutral_front_cropped
+python create-initial-states.py --nsteps 1000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
+python warp-train.py experiments/001_002-baseline.yaml
 ```
 
-Additionally, we provide a `Makefile` with the source code, that trains the initial state and runs the example warping experiment.
+Additionally, we provide a `Makefile` with the source code, that trains the initial states (or downloads them from [here](https://drive.google.com/file/d/1QYoprK2bycXHItSkx9H8JfMGz48B9a3N/view?usp=sharing) or [here](https://drive.google.com/file/d/1guMg5ablWDQgaSfr5sFwScPWa-gm5Vsz/view?usp=sharing) if you want the cropped images) and runs the example warping experiment.
 
 ### Reproducing the paper's experiments
-To avoid cluttering the repository, we've opted to not store the experiment configuration files here. You can generate them after following the *Setup* procedure above. For convenience, you can download the experiment files and pretrained image networks from [here](). However, the steps to recreate those files is described below. We always assume that the commands are typed from the repository root. Additionally, we assume that the python environment is activated. First, you must crop and resize the FRLL face images, afterwards you may create the initial states. You can do so by typing:
+To avoid cluttering the repository, we've opted to not store the experiment configuration files here. You can generate them after following the *Setup* procedure above. For convenience, you can download the experiment files from [here](https://drive.google.com/file/d/1S1J_lsuGxPeU3DMOJMinXSjHGi91m9Ru/view?usp=sharing) and pretrained image networks from [here](https://drive.google.com/file/d/1QYoprK2bycXHItSkx9H8JfMGz48B9a3N/view?usp=sharing) (also, see the **Makefile**). However, the steps to recreate those files is described below. We always assume that the commands are typed from the repository root. Additionally, we assume that the python environment is activated. First, you must crop and resize the FRLL face images, afterwards you may create the initial states. You can do so by typing:
 
 ```{sh}
-python align.py --just-crop --output-size 1350 --n-tasks 4 data/frll/ data/frll_cropped
-python create-initial-states.py --nsteps 1000 --device cuda:0 --output_path pretrained/frll_cropped experiments/initial_state_rgb_large_im.yaml data/frll_cropped/*.png
+python align.py --just-crop --output-size 1350 --n-tasks 4 data/frll/ data/frll_neutral_front_cropped
+python create-initial-states.py --nsteps 5000 --device cuda:0 --output_path pretrained/frll_neutral_front_cropped experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front_cropped/*.png
 ```
 
-Note that `data/frll_cropped` is not in the repository as well. You can download those [here]().
-This will store all images in `data/frll_cropped` in the `pretrained/frll_croppped` folder. Afterwards, run the script to detect the landmarks, followed by the script to create the experiment configuration files:
+Note that `data/frll_neutral_front_cropped` is not in the repository as well. You can download the original images from the FRLL repository (see our **Makefile**) and crop them using the first command above.
+This will store all images in `data/frll_neutral_front_cropped` in the `pretrained/frll_neutral_front_croppped` folder. Afterwards, run the script to detect the landmarks, followed by the script to create the experiment configuration files:
 
 ```{sh}
-python standalone/detect_landmarks.py pretrained/frll_cropped/
-python standalone/create_experiment_files.py data/pairs_for_morphing_full.txt pretrained/frll_cropped/ experiments/pairwise_dlib
+python detect_landmarks.py pretrained/frll_neutral_front_cropped/
+python standalone/create_experiment_files.py data/pairs_for_morphing_full.txt pretrained/frll_neutral_front_cropped/ experiments/pairwise_dlib
 ```
 
 Finally, you can simply train the warpings by issuing the following command:
@@ -125,3 +124,5 @@ The above command will run the trainings sequentially. However, if you may notic
 ```{sh}
 python warp-train.py experiments/pairwise_dlib/*.yaml --no-ui --logging none --device cuda:0 --output-path results/pairwise_dlib --n-tasks 6 --skip-finished --no-reconstruction
 ```
+
+### Contributing
