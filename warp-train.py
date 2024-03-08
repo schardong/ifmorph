@@ -46,7 +46,7 @@ def train_warping(experiment_config_path, output_path, args):
     with open(experiment_config_path, "r") as fin:
         config = yaml.safe_load(fin)
 
-    experiment_name = osp.split(experiment_config_path)[-1].split(".")[0]
+    experiment_name = osp.splitext(osp.split(experiment_config_path)[-1])[0]
     config["experiment_name"] = experiment_name
 
     os.makedirs(output_path, exist_ok=True)
@@ -360,7 +360,7 @@ if __name__ == "__main__":
 
     paths_to_run = []
     for p in args.config_path:
-        fname = osp.split(p)[-1][:-5]  # removing the file extension
+        fname = osp.splitext(osp.split(p)[-1])[0]  # removing the file extension
         outpath = osp.join(args.output_path, f"{fname}")
         weights_path = osp.join(outpath, "weights.pth")
         if args.skip_finished and osp.exists(weights_path):
