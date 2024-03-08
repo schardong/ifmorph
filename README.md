@@ -125,4 +125,19 @@ The above command will run the trainings sequentially. However, if you may notic
 python warp-train.py experiments/pairwise_dlib/*.yaml --no-ui --logging none --device cuda:0 --output-path results/pairwise_dlib --n-tasks 6 --skip-finished --no-reconstruction
 ```
 
-### Contributing
+## Contributing
+Any contribution is welcome. If you spot an error or have questions, open issues and we will answer as soon as possible.
+
+## Citation
+If you find our work useful in your research, consider citing it in your tech report or paper.
+
+```{bibtex}
+@misc{schardong2024neural,
+      title={Neural Implicit Morphing of Face Images},
+      author={Guilherme Schardong and Tiago Novello and Hallison Paz and Iurii Medvedev and Vinícius da Silva and Luiz Velho and Nuno Gonçalves},
+      year={2024},
+      eprint={2308.13888},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
