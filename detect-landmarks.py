@@ -42,7 +42,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--plot-landmarks", "-p", action="store_true", default=False,
-        help="Plots the landamarks over the saved images. Only makes sense"
+        help="Plots the landmarks over the saved images. Only makes sense"
         " when passing \"--saveim\" as well, ignored otherwise."
     )
     args = parser.parse_args()
@@ -63,9 +63,8 @@ if __name__ == "__main__":
     for modelname in args.models:
         faceim = from_pth(modelname, device=device).eval()
         img = image_inference(faceim, dims, device=device)
-        lms = get_landmarks_dlib(img)
+        lms = get_landmarks_dlib(img).astype(float)
         key = osp.splitext(osp.split(modelname)[1])[0]
-        lmdict[key] = lms
 
         if args.saveim:
             imname = osp.splitext(osp.split(modelname)[-1])[0] + ".png"
@@ -75,6 +74,10 @@ if __name__ == "__main__":
                 osp.join(args.outputdir, imname),
                 cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             )
+
+        lms[:, 0] = 2.0 * (lms[:, 0] / img.shape[0]) - 1.0
+        lms[:, 1] = 2.0 * (lms[:, 1] / img.shape[1]) - 1.0
+        lmdict[key] = lms
 
     for lmname, lm in lmdict.items():
         lm.dump(osp.join(args.outputdir, lmname) + ".dat")
