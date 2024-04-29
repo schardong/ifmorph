@@ -5,13 +5,15 @@
 [Iurii Medvedev [1]](https://visteam.isr.uc.pt/team/iurii-medvedev)
 [Vinícius da Silva [2]](https://dsilvavinicius.github.io/),
 [Luiz Velho [1]](https://lvelho.impa.br/)
-[Nuno Gonçalves [3]](https://home.deec.uc.pt/~nunogon/)
+[Nuno Gonçalves [1,4]](https://home.deec.uc.pt/~nunogon/)
 <br>
 [1] Institute of Systems and Robotics, University of Coimbra (UC)
 <br>
 [2] Institute for Pure and Applied Mathematics (IMPA),
 <br>
 [3] Pontifical Catholic University of Rio de Janeiro (PUC-Rio),
+<br>
+[4] Portuguese Mint and Official Printing Office (INCM),
 
 This is the official implementation of "Neural Implicit Morphing of Face Images", to appear at the Proceedings of CVPR 2024, published on [arXiv](https://arxiv.org/abs/2308.13888).
 
