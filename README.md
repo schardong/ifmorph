@@ -3,8 +3,8 @@
 [Tiago Novello [2]](https://sites.google.com/site/tiagonovellodebrito),
 [Hallison Paz [2]](https://hallisonpaz.com.br/)
 [Iurii Medvedev [1]](https://visteam.isr.uc.pt/team/iurii-medvedev)
-[Vinícius da Silva [2]](https://dsilvavinicius.github.io/),
-[Luiz Velho [1]](https://lvelho.impa.br/)
+[Vinícius da Silva [3]](https://dsilvavinicius.github.io/),
+[Luiz Velho [2]](https://lvelho.impa.br/)
 [Nuno Gonçalves [1,4]](https://home.deec.uc.pt/~nunogon/)
 <br>
 [1] Institute of Systems and Robotics, University of Coimbra (UC)
