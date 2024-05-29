@@ -163,14 +163,16 @@ if __name__ == "__main__":
         rec0, coords0 = warped_shapenet_inference(
             tgrid, model, shapenets[0], grid_dims,
             rot_angle=np.deg2rad(args.rots),
-            translation=[args.tsx, args.tsy]
+            translation=[args.tsx, args.tsy],
+            bggray=255
         )
 
         tgrid[..., -1] = 1 - t
         rec1, coords1 = warped_shapenet_inference(
             tgrid, model, shapenets[1], grid_dims,
             rot_angle=np.deg2rad(args.rott),
-            translation=[args.ttx, args.tty]
+            translation=[args.ttx, args.tty],
+            bggray=255
         )
 
         frame = blend_frames(rec0, rec1, t, blending_type)
