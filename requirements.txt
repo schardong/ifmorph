@@ -1,5 +1,5 @@
 matplotlib==3.6.0
-mediapipe==0.9.0.1
+mediapipe==0.9.1.0
 numpy==1.23.3
 nvidia-cublas-cu11==11.10.3.66
 nvidia-cuda-nvrtc-cu11==11.7.99
@@ -14,3 +14,4 @@ PyYAML==6.0
 tensorboard==2.11.0
 torch==1.13.1
 torchvision==0.14.1
+dlib=19.24.4

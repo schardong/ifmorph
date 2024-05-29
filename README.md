@@ -47,13 +47,21 @@ Inside the `standalone` folder, we've stored scripts that are related, but not n
 * `create-experiment-files.py` - given a list of pairs, image paths and landmarks, creates the corresponding experiment files
 
 ### Setup and sample run
-For this setup, we assume that the Python version is >= 3.10.0 and CUDA Toolkit is 11.6. We also tested with Python 3.9.0 and CUDA 11.7 everything worked as well. Note that for both PyEnv and Conda **we assume that all commands are typed in the root of the repository**.
+For this setup, we assume that the Python version is >= 3.10.0 and CUDA Toolkit is 11.6. We also tested with Python 3.9.0 and CUDA 11.7 everything worked as well. Note that **we assume that all commands are typed in the root of the repository**, unless stated otherwise. **Note that we tested these steps only on Ubuntu 22.04.**
 
 (Optional) After cloning the repository, issue a `git submodule init` followed by `git submodule update` command on a terminal, to download the `mrimg` submodule.
 
-#### PyEnv
-First, you need to have both [PyEnv](https://github.com/pyenv/pyenv) and [PyEnv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) installed. Afterwards, just type the following commands in a terminal. **Note that we tested these steps only on Ubuntu 22.04**
+#### venv
+Using Python's [venv](https://docs.python.org/3/library/venv.html) is the simplest option, as it involves no addons other than a functioning Python installation. Simply open a terminal, navigate to the repository root and type the following commands:
+```{sh}
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+```
 
+#### PyEnv
+First, you need to have both [PyEnv](https://github.com/pyenv/pyenv) and [PyEnv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) installed. Afterwards, just type the following commands in a terminal.
 ```{sh}
 pyenv virtualenv 3.10.0 ifmorph
 pyenv local ifmorph
