@@ -3,3 +3,6 @@
 pretrained/
 results/
 landmark_models/
+experiments/frll_neutral_front_cropped/*
+*.egg-info/
+.vscode/
