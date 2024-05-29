@@ -234,7 +234,7 @@ def batched_predict(model: torch.nn.Module, coord_arr: torch.Tensor,
 
 def warped_shapenet_inference(
         grid_with_t, warpnet, shapenet, framedims, rot_angle=0,
-        translation=(0, 0)
+        translation=(0, 0), bggray=0
 ):
     """Performs the inference on a `warpnet` and feeds the results to a
     `shapenet`.
@@ -278,16 +278,56 @@ def warped_shapenet_inference(
     img = shapenet(coords)["model_out"].detach().clamp(0, 1) * 255
     # restrict to the image domain [-1,1]^2
     img = torch.where(
-        torch.abs(coords[..., 0].unsqueeze(-1)) < 1, img, torch.zeros_like(img)
+        torch.abs(coords[..., 0].unsqueeze(-1)) < 1.0, img, torch.full_like(img, bggray)
     )
     img = torch.where(
-        torch.abs(coords[..., 1].unsqueeze(-1)) < 1, img, torch.zeros_like(img)
+        torch.abs(coords[..., 1].unsqueeze(-1)) < 1.0, img, torch.full_like(img, bggray)
     )
     img = img.reshape([framedims[0], framedims[1], shapenet.out_features])
     return img, coords
 
 
-def blend_frames(f1, f2, t, blending_type, plot_landmarks=False, f1lm=None, f2lm=None):
+def plot_landmarks(im: np.array, lm: np.array, c=(0, 255, 0), r=3) -> np.array:
+    """Overlays landmarks `lm` on the image `im` with colors `c` and radius
+    `r`.
+    
+    Parameters
+    ----------
+    im: np.array
+        The HxWx3 image.
+
+    lm: np.array
+        The Nx2 landmark coordinates. If they are in range [-1, 1] or [0, 1],
+        we will normalize them using `im.shape`.
+
+    c: tuple, optional
+        The RGB landmark color.
+
+    r: int, optional
+        The landmark radius
+
+    Returns
+    -------
+    imnp: np.ndarray
+        The input image in numpy format with landmarks overlaid.
+    """
+    imc = im.copy()
+    lmn = lm.copy()
+
+    if lm.max() <= 1.0:  # assumed to be in [?, 1] range
+        if lm.min() < 0:  # assumed to be in range [-1, 1]
+            lmn = (lmn + 1.0) / 2.0
+        lmn[:, 0] *= imc.shape[0]
+        lmn[:, 1] *= imc.shape[1]
+        lmn = lmn.astype(np.uint32)
+
+    for l in lmn:
+        imc[(l[0]-5):(l[0]+5), (l[1]-5):(l[1]+5), :] = c
+
+    return imc
+
+
+def blend_frames(f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: str) -> torch.Tensor:
     """Blends frames `f1` and `f2` following `blending_type`.
 
     Parameters
