@@ -1,3 +1,4 @@
+dlib=19.24.4
 matplotlib==3.6.0
 mediapipe==0.9.1.0
 numpy==1.23.3
@@ -11,7 +12,8 @@ pandas==1.5.0
 Pillow==9.2.0
 pytz==2022.7
 PyYAML==6.0
+pytorch-fid==0.3.0
+scipy==1.13.1
 tensorboard==2.11.0
 torch==1.13.1
 torchvision==0.14.1
-dlib=19.24.4
