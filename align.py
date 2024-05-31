@@ -9,7 +9,6 @@ import dlib
 import numpy as np
 import PIL.Image
 import scipy.ndimage
-from tqdm import tqdm
 from argparse import ArgumentParser
 
 
@@ -208,33 +207,28 @@ if __name__ == "__main__":
         os.makedirs(ALIGNED_IMAGES_DIR)
 
     files = sorted([f for f in os.listdir(RAW_IMAGES_DIR) if f.endswith("png") or f.endswith("jpg")])
-    print(f"total img files {len(files)}")
-    with tqdm(total=len(files)) as progress:
+    print(f"Total image files: {len(files)}")
 
-        def cb(*args):
-            # print('update')
-            progress.update()
+    def err_cb(e):
+        print(f"error: {e}", file=sys.stderr)
 
-        def err_cb(e):
-            print(f"error: {e}", file=sys.stderr)
+    with Pool(args.n_tasks) as pool:
+        res = []
+        landmarks_detector = LandmarksDetector(args.landmark_detector)
+        for img_name in files:
+            raw_img_path = os.path.join(RAW_IMAGES_DIR, img_name)
+            for i, face_landmarks in enumerate(
+                    landmarks_detector.get_landmarks(raw_img_path),
+                    start=1):
 
-        with Pool(args.n_tasks) as pool:
-            res = []
-            landmarks_detector = LandmarksDetector(args.landmark_detector)
-            for img_name in files:
-                raw_img_path = os.path.join(RAW_IMAGES_DIR, img_name)
-                for i, face_landmarks in enumerate(
-                        landmarks_detector.get_landmarks(raw_img_path),
-                        start=1):
+                job = pool.apply_async(
+                    work_landmark,
+                    (raw_img_path, img_name, face_landmarks, args.output_size, args.just_crop),
+                    error_callback=err_cb
+                )
+                res.append(job)
 
-                    job = pool.apply_async(
-                        work_landmark,
-                        (raw_img_path, img_name, face_landmarks, args.output_size, args.just_crop),
-                        callback=cb,
-                        error_callback=err_cb,
-                    )
-                    res.append(job)
+        pool.close()
+        pool.join()
 
-            pool.close()
-            pool.join()
-    print(f"output aligned images at: {ALIGNED_IMAGES_DIR}")
+    print(f"Output aligned images at: {ALIGNED_IMAGES_DIR}")
