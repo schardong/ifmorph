@@ -6,3 +6,5 @@ landmark_models/
 experiments/frll_neutral_front_cropped/*
 *.egg-info/
 .vscode/
+data/frll_neutral_front_cropped
+data/frll_neutral_front
