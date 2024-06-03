@@ -287,6 +287,30 @@ def warped_shapenet_inference(
     return img, coords
 
 
+def warp_points(
+        model: torch.nn.Module, points: torch.Tensor, t: float
+) -> torch.Tensor:
+    """Warps Nx2 `points` by parameter `t` \in [0, 1] using `model`.
+    
+    Parameters
+    ----------
+    model: torch.nn.Module
+        A warping network with input Nx3.
+
+    points: torch.Tensor
+        Nx2 tensor of points to be warped.
+
+    t: number
+        Parameter in [0, 1] range to warp the points.
+
+    Returns
+    -------
+    warped_points: torch.Tensor
+    """
+    t_points = torch.cat((points, torch.full_like(points[..., -1:], t)), dim=1)
+    return model(t_points)["model_out"]
+
+
 def plot_landmarks(im: np.array, lm: np.array, c=(0, 255, 0), r=3) -> np.array:
     """Overlays landmarks `lm` on the image `im` with colors `c` and radius
     `r`.
@@ -516,22 +540,32 @@ def create_morphing_video(
 
             rec = blend_frames(rec0, rec1, t, blending_type=blending_type)
             rec = cv2.cvtColor(rec, cv2.COLOR_RGB2BGR)
+            cv2.putText(
+                img=rec, text='Time = %.2f' % (t.item()), org=(0, 30),
+                fontFace=cv2.FONT_HERSHEY_TRIPLEX, fontScale=0.5,
+                color=(255, 255, 255), thickness=1
+            )
 
             if plot_landmarks:
-                src_coord = torch.cat((src, t*torch.ones_like(src[..., -1:])), dim=1)
-                src_deform = warp_net(src_coord)["model_out"].detach().cpu().numpy()
-                list_src_deform = list(src_deform)
-
-                tgt_coord = torch.cat((tgt, (t-1)*torch.ones_like(src[..., -1:])), dim=1)
-                tgt_deform = warp_net(tgt_coord)["model_out"].detach().cpu().numpy()
-                list_tgt_deform = list(tgt_deform)
-                for (point_tgt, point_src) in zip(list_tgt_deform, list_src_deform):
-                    rec = cv2.circle(rec, (int(frame_dims[1]*(point_src[1]+1)/2), int(frame_dims[0]*(point_src[0]+1)/2)), radius=1, color=(255, 0, 0), thickness=-1)
-                    rec = cv2.circle(rec, (int(frame_dims[1]*(point_tgt[1]+1)/2), int(frame_dims[0]*(point_tgt[0]+1)/2)), radius=1, color=(0, 255, 0), thickness=-1)
-                    cv2.putText(img=rec, text='Time = %.2f' % (t.item()), org=(0, 30), fontFace=cv2.FONT_HERSHEY_TRIPLEX, fontScale=0.5, color=(255, 255, 255), thickness=1)
-
+                warped_src = list(
+                    warp_points(warp_net, src, t).detach().cpu().numpy()
+                )
+                warped_tgt = list(
+                    warp_points(warp_net, tgt, t - 1).detach().cpu().numpy()
+                )
+                for (point_tgt, point_src) in zip(warped_tgt, warped_src):
+                    norm_src = (int(frame_dims[1]*(point_src[1]+1)/2),
+                                int(frame_dims[0]*(point_src[0]+1)/2))
+                    norm_tgt = (int(frame_dims[1]*(point_tgt[1]+1)/2),
+                                int(frame_dims[0]*(point_tgt[0]+1)/2))
+                    rec = cv2.circle(
+                        rec, norm_src, radius=1, color=(255, 0, 0), thickness=-1
+                    )
+                    rec = cv2.circle(
+                        rec, norm_tgt, radius=1, color=(0, 255, 0), thickness=-1
+                    )
+        
             out.write(rec)
-
     out.release()
 
 
