@@ -127,7 +127,6 @@ def train_warping(experiment_config_path, output_path, args):
 
     if loss_config["type"] == "featurematching":
         src, tgt = None, None
-        src_img, tgt_img = None, None
         if "sources" not in loss_config or "targets" not in loss_config:
             src, tgt, _, _ = return_points_morph_mediapipe(
                 data.initial_states[0],
@@ -147,7 +146,7 @@ def train_warping(experiment_config_path, output_path, args):
             tgt = np.array(loss_config["targets"])
 
         if not args.no_ui:
-            src, tgt, src_img, tgt_img = return_points_morph(
+            src, tgt, _, _ = return_points_morph(
                 data.initial_states[0],
                 data.initial_states[1],
                 grid_dims,
@@ -268,19 +267,27 @@ def train_warping(experiment_config_path, output_path, args):
     print("Training done.")
     print(f"Best results at step {best_step}, with loss {best_loss}.")
     print(f"Saving the results in folder {output_path}.")
-    torch.save(best_weights, osp.join(output_path, "weights_with_w0.pth"))
-    model.update_omegas()
-    torch.save(
-        model.state_dict(), osp.join(output_path, "weights.pth")
-    )
+    model = model.eval()
+    with torch.no_grad():
+        model.update_omegas(w0=1, ww=None)
+        torch.save(
+            model.state_dict(), osp.join(output_path, "weights.pth")
+        )
+
+        model.w0 = network_config["omega_0"]
+        model.ww = network_config["omega_w"]
+        print(model.w0, model.ww)
+        model.load_state_dict(best_weights)
+        model.update_omegas(w0=1, ww=None)
+        torch.save(
+            model.state_dict(), osp.join(output_path, "best.pth")
+        )
 
     loss_df = pd.DataFrame.from_dict(training_loss)
     loss_df.to_csv(osp.join(output_path, "loss.csv"), sep=";")
 
     if not args.no_reconstruction:
         print("Running the inference.")
-        model = model.eval()
-        model.load_state_dict(best_weights)
 
         vidpath = osp.join(output_path, "video.mp4")
         create_morphing_video(
