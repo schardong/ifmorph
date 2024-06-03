@@ -13,7 +13,8 @@ import torch
 import yaml
 from ifmorph.dataset import check_network_type
 from ifmorph.model import from_pth
-from ifmorph.util import get_grid, blend_frames, warped_shapenet_inference
+from ifmorph.util import (get_grid, blend_frames, plot_landmarks,
+                          warped_shapenet_inference, warp_points)
 
 WITH_MRNET = True
 try:
@@ -176,6 +177,39 @@ if __name__ == "__main__":
         )
 
         frame = blend_frames(rec0, rec1, t, blending_type)
+
+        if args.landmarks:
+            color = None
+            lms = None
+            ts = None
+            if blending_type == "src":
+                color = (225, 0, 0)
+                lms = config["loss"]["sources"]
+                ts = t
+            elif blending_type == "tgt":
+                color = (0, 225, 0)
+                lms = config["loss"]["targets"]
+                ts = t - 1
+            else:
+                color = [(225, 0, 0), (0, 225, 0)]
+                lms = [
+                    config["loss"]["sources"],
+                    config["loss"]["targets"]
+                ]
+                ts = [t, t - 1]
+
+            if isinstance(lms, list):
+                for c, lm, t2 in zip(color, lms, ts):
+                    lm = warp_points(
+                        model, torch.Tensor(lm).to(device=device).float(), t2
+                    ).detach().cpu().numpy()
+                    frame = plot_landmarks(frame, lm, c=c, r=3)
+            else:
+                lm = warp_points(
+                    model, torch.Tensor(lms).to(device=device).float(), ts
+                ).detach().cpu().numpy()
+                frame = plot_landmarks(frame, lm=lm, c=color, r=3)
+
         impath = baseimpath.format(t)
         cv2.imwrite(
             impath, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)

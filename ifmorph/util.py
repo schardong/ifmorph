@@ -345,7 +345,7 @@ def plot_landmarks(im: np.array, lm: np.array, c=(0, 255, 0), r=3) -> np.array:
         lmn[:, 1] *= imc.shape[1]
         lmn = lmn.astype(np.uint32)
 
-    rad = r//2
+    rad = int(math.ceil(r / 2))
     for l in lmn:
         imc[(l[0]-rad):(l[0]+rad), (l[1]-rad):(l[1]+rad), :] = c
 
