@@ -126,12 +126,6 @@ class FeatureMatchingWarpingLoss(torch.nn.Module):
 
     Parameters
     ----------
-    image_src: torch.nn.Module
-        A network representing the source image. Must be twice differentiable.
-
-    image_tgt: torch.nn.Module
-        A network representing the target image. Must be twice differentiable.
-
     warp_src_pts: torch.Tensor
         An Nx2 tensor with the feature locations in the source image. Note that
         these points must be normalized to the [-1, 1] range.
@@ -156,16 +150,12 @@ class FeatureMatchingWarpingLoss(torch.nn.Module):
     """
     def __init__(
             self,
-            image_src: torch.nn.Module,
-            image_tgt: torch.nn.Module,
             warp_src_pts: torch.Tensor,
             warp_tgt_pts: torch.Tensor,
             intermediate_times: list = [0.25, 0.5, 0.75],
             constraint_weights: dict = DEFAULT_WEIGHTS_FMLOSS
     ):
         super(FeatureMatchingWarpingLoss, self).__init__()
-        self.image_src = image_src.eval()
-        self.image_tgt = image_tgt.eval()
         self.src = warp_src_pts
         self.tgt = warp_tgt_pts
         self.intermediate_times = intermediate_times

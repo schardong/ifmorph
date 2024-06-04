@@ -176,7 +176,6 @@ def train_warping(experiment_config_path, output_path, args):
         loss_config["noise_scale"] = args.noise_scale
 
         loss_func = FeatureMatchingWarpingLoss(
-            data.initial_states[0], data.initial_states[1],
             warp_src_pts=src,
             warp_tgt_pts=tgt,
             intermediate_times=int_times,
