@@ -128,19 +128,32 @@ class ImageDataset(Dataset):
 
         t = transforms.Compose(t)
         self.coords = get_grid(grid_dims)
-        self.pixels = t(img).permute(1, 2, 0).view(-1, self.n_channels)
+        self.rgb = t(img).permute(1, 2, 0).view(-1, self.n_channels)
         if not batch_size:
-            self.batch_size = self.pixels.shape[0]
+            self.batch_size = self.rgb.shape[0]
         else:
             self.batch_size = batch_size
 
+    def pixels(self, coords):
+        """
+        Parameters
+        ----------
+        coords: torch.Tensor
+            Point tensor in range [-1, 1]. Must have shape Nx2.
+        """
+        intcoords = coords.detach().clone().cpu() * 0.5 + 0.5
+        intcoords[..., 0] *= self.size[0]
+        intcoords[..., 1] *= self.size[1]
+        intcoords = intcoords.long()
+        return self.rgb[intcoords[..., 0] * intcoords[..., 1], ...]
+
     def __len__(self):
-        return self.pixels.shape[0] // self.batch_size
+        return self.rgb.shape[0] // self.batch_size
 
     def __getitem__(self, idx=None):
         if idx is None or not len(idx):
             idx = torch.randint(self.coords.shape[0], (self.batch_size,))
-        return self.coords[idx, ...], self.pixels[idx, ...], idx
+        return self.coords[idx, ...], self.rgb[idx, ...], idx
 
 
 class WarpingDataset(Dataset):
@@ -220,10 +233,6 @@ class WarpingDataset(Dataset):
         X: torch.Tensor
             A [`num_samples`, 3] shaped tensor with the pixel coordinates at
             the first two columns, and time coordinates at the last column.
-
-        y: torch.Tensor
-            A [`num_samples`] shaped tensor with the image values at the
-            initial conditions, and a -1 marker for intermediate times.
         """
         # # Spatial coordinates
         N = self.num_samples // 2
@@ -244,6 +253,68 @@ class WarpingDataset(Dataset):
             (X, torch.hstack((self.coords, int_times.unsqueeze(1)))),
             dim=0
         )
+        return X
+
+
+class DiscreteImageWarpingDataset(Dataset):
+    """A Warping dataset that uses discrete images in place of neural images.
+    
+    Parameters
+    ----------
+    initial_states: list[Str, PathLike]
+        Paths to the images
+
+    num_samples: int
+        Number of samples to draw at each call to `__getitem__`
+
+    device: str, torch.device
+    """
+    def __init__(self, initial_states: list, num_samples: int,
+                 device: str = "cpu"):
+        super(DiscreteImageWarpingDataset, self).__init__()
+        self.device = device
+        self.batch_size = num_samples
+        # Half the samples will be on the initial states. Thus, each initial
+        # state must have a quarter of the total samples.
+        self.im_batch_size = num_samples // 4
+        self.initial_states = [None] * len(initial_states)
+        self.known_times = [None] * len(initial_states)
+        self.time_range = [-1.0, 1.0]
+        for i, (state_path, t) in enumerate(initial_states):
+            self.initial_states[i] = ImageDataset(
+                state_path, batch_size=self.im_batch_size
+            )
+            self.known_times[i] = t
+
+    def __len__(self):
+        return 1
+    
+    def __getitem__(self, _):
+        """
+        Returns
+        -------
+        X: torch.Tensor
+            A [`num_samples`, 3] shaped tensor with the pixel coordinates at
+            the first two columns, and time coordinates at the last column.
+        """
+        # Half of the samples are on the initial states, as explained above.
+        N = self.batch_size // 2
+
+        # Temporal coordinates \in (0, 1), renormalized to the actual time
+        # ranges of the initial conditions.
+        t1, t2 = self.time_range
+        int_times = torch.rand(N, device=self.device) * (t2 - t1) + t1
+
+        coords, _, _ = self.initial_states[0].__getitem__(None)
+        coords = coords.to(self.device)
+        tcol = torch.cat((
+            torch.Tensor([self.known_times[0]] * int(math.floor(N / 2))).to(self.device),
+            int_times,
+            torch.Tensor([self.known_times[1]] * int(math.ceil(N / 2))).to(self.device)
+        ))
+        X = torch.cat((
+            torch.cat([coords] * 4, dim=0), tcol.unsqueeze(-1)
+        ), dim=1)
         return X
 
 
@@ -306,10 +377,28 @@ class NoTimeWarpingDataset(WarpingDataset):
 
 
 if __name__ == "__main__":
-    data = WarpingDataset([
-        ("pretrained/yaleB01_P00A+000E+00.pth", -0.5),
-        ("pretrained/yaleB11_P00A+000E+00.pth", 0.0),
-        ("pretrained/yaleB27_P00A+000E+00.pth", 0.5)
-    ], 48)
-    X = data[0]
-    print(X.shape)
+    wd = DiscreteImageWarpingDataset(
+        [("data/frll_neutral_front/001_03.jpg", 0.0), ("data/frll_neutral_front/002_03.jpg", 1.0)],
+        20
+    )
+    print(wd.batch_size, wd.im_batch_size)
+    pts = wd.__getitem__(None)
+
+    # im = ImageDataset("data/frll_neutral_front/001_03.jpg", batch_size=30)
+    # X, y = im.__getitem__(None)
+    # print(X.shape, y.shape)
+    # X, y = im.__getitem__([])
+    # print(X.shape, y.shape)
+    # X, y = im.__getitem__()
+    # print(X.shape, y.shape)
+
+    # idx = torch.randint(100, (im.batch_size,))
+    # X, y = im.__getitem__(idx)
+    # print(X.shape, y.shape)
+    # data = WarpingDataset([
+    #     ("pretrained/yaleB01_P00A+000E+00.pth", -0.5),
+    #     ("pretrained/yaleB11_P00A+000E+00.pth", 0.0),
+    #     ("pretrained/yaleB27_P00A+000E+00.pth", 0.5)
+    # ], 48)
+    # X = data[0]
+    # print(X.shape)
