@@ -137,9 +137,10 @@ class ImageDataset(Dataset):
     def __len__(self):
         return self.pixels.shape[0] // self.batch_size
 
-    def __getitem__(self, _):
-        # TODO: Implement code for batching here.
-        return self.coords, self.pixels
+    def __getitem__(self, idx=None):
+        if idx is None or not len(idx):
+            idx = torch.randint(self.coords.shape[0], (self.batch_size,))
+        return self.coords[idx, ...], self.pixels[idx, ...], idx
 
 
 class WarpingDataset(Dataset):
