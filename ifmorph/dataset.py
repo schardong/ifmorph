@@ -151,8 +151,28 @@ class ImageDataset(Dataset):
         return self.rgb.shape[0] // self.batch_size
 
     def __getitem__(self, idx=None):
+        """
+        Parameters
+        ----------
+        idx: list or torch.Tensor, optional
+            Linearized pixel indices. If not given, will choose at random.
+
+        Returns
+        -------
+        coords: torch.Tensor
+            Nx2 linearized pixel coordinates
+
+        rgb: torch.Tensor
+            The Nx`self.n_channels` Pixel values. The number of columns depends
+            on the number of channels of the input image.
+
+        idx: torch.Tensor
+            Indices of the pixels returned.
+        """
         if idx is None or not len(idx):
             idx = torch.randint(self.coords.shape[0], (self.batch_size,))
+        elif not isinstance(idx, torch.Tensor):
+            idx = torch.Tensor(idx)
         return self.coords[idx, ...], self.rgb[idx, ...], idx
 
 
@@ -258,7 +278,7 @@ class WarpingDataset(Dataset):
 
 class DiscreteImageWarpingDataset(Dataset):
     """A Warping dataset that uses discrete images in place of neural images.
-    
+
     Parameters
     ----------
     initial_states: list[Str, PathLike]
@@ -288,7 +308,7 @@ class DiscreteImageWarpingDataset(Dataset):
 
     def __len__(self):
         return 1
-    
+
     def __getitem__(self, _):
         """
         Returns
