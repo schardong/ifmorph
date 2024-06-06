@@ -237,7 +237,7 @@ def warped_shapenet_inference(
         translation=(0, 0), bggray=0
 ):
     """Performs the inference on a `warpnet` and feeds the results to a
-    `shapenet`.
+    `shapenet`, normalizing the areas out-of-domain.
 
     Parameters
     ----------
@@ -290,8 +290,8 @@ def warped_shapenet_inference(
 def warp_points(
         model: torch.nn.Module, points: torch.Tensor, t: float
 ) -> torch.Tensor:
-    """Warps Nx2 `points` by parameter `t` \in [0, 1] using `model`.
-    
+    """Warps `points` by parameter `t` \in [-1, 1] using `model`.
+
     Parameters
     ----------
     model: torch.nn.Module
@@ -301,7 +301,7 @@ def warp_points(
         Nx2 tensor of points to be warped.
 
     t: number
-        Parameter in [0, 1] range to warp the points.
+        Parameter in [-1, 1] range to warp the points.
 
     Returns
     -------
@@ -314,7 +314,7 @@ def warp_points(
 def plot_landmarks(im: np.array, lm: np.array, c=(0, 255, 0), r=3) -> np.array:
     """Overlays landmarks `lm` on the image `im` with colors `c` and radius
     `r`.
-    
+
     Parameters
     ----------
     im: np.array
@@ -352,7 +352,7 @@ def plot_landmarks(im: np.array, lm: np.array, c=(0, 255, 0), r=3) -> np.array:
     return imc
 
 
-def blend_frames(f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: str) -> torch.Tensor:
+def blend_frames(f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: str) -> np.array:
     """Blends frames `f1` and `f2` following `blending_type`.
 
     Parameters
@@ -373,7 +373,9 @@ def blend_frames(f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: st
 
     Returns
     -------
-    blended_frame: torch.Tensor
+    blended_frame: np.array
+        The blended frame as a numpy array. Already normalized to 0-255 range
+        and with dtype=np.uint8.
     """
     if blending_type == "linear":
         rec = (1 - t) * f1 + t * f2
@@ -419,6 +421,8 @@ def blend_frames(f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: st
         )
 
     if isinstance(rec, torch.Tensor):
+        if rec.max() <= 1.0:
+            rec *= 255.0
         rec = rec.detach().cpu().numpy().astype(np.uint8)
 
     return rec
@@ -527,13 +531,13 @@ def create_morphing_video(
 
         for t in times:
             tgrid[..., -1] = -t
-            rec0, coords0 = warped_shapenet_inference(
+            rec0, _ = warped_shapenet_inference(
                 tgrid, warp_net, shape_net0, frame_dims, rot_angle=angles[0],
                 translation=translations[0]
             )
 
             tgrid[..., -1] = 1 - t
-            rec1, coords1 = warped_shapenet_inference(
+            rec1, _ = warped_shapenet_inference(
                 tgrid, warp_net, shape_net1, frame_dims, rot_angle=angles[1],
                 translation=translations[1]
             )
@@ -564,10 +568,131 @@ def create_morphing_video(
                     rec = cv2.circle(
                         rec, norm_tgt, radius=1, color=(0, 255, 0), thickness=-1
                     )
-        
+
             out.write(rec)
     out.release()
 
+
+def discrete_morphing_video(
+        warp_net: torch.nn.Module,
+        frame0: torch.utils.data.Dataset,
+        frame1: torch.utils.data.Dataset,
+        output_path: str,
+        n_frames: int,
+        fps: int,
+        device: torch.device,
+        landmarks_src,
+        landmarks_tgt,
+        plot_landmarks=True,
+        blending_type="linear"
+):
+    """Creates a video file given a model and output path.
+
+    Parameters
+    ----------
+    warp_net: torch.nn.Module
+        The warping model. It must be a coordinate model with three
+        inputs (u, v, t), where u, v range in [-1, 1] and t is the time, which
+        may have the same range as u, v, and is given by the `time_range`
+        parameter.
+
+    frame0: ifmorph.dataset.ImageDataset
+
+    frame1: ifmorph.dataset.ImageDataset
+
+    output_path: str, PathLike
+        Output path to the video generated.
+
+    n_frames: int
+        The number of frames in the final video.
+
+    fps: int
+        Frames-per-second of the video.
+
+    device: torch.device
+        The device to run the inference for all networks. All intermediate
+        tensors will be allocated with this device option.
+
+    landmarks_src: torch.Tensor
+        Warping source points
+
+    landmarks_tgt: torch.Tensor
+        Warping target points
+
+    plot_landmarks: boolean, optional
+        Switch to plot the warping points over the video (if True), or not
+        (if False, default behaviour)
+
+    blending_type: str, optional
+        How to perform the blending of the initial states, may be "linear"
+        (default), which performs a linear interpolation of the states.
+        "minimum" and "maximum" get minimum(maximum) color values between the
+        inferences of `shape_net0` and `shape_net1` at the warped coordinates.
+        Finally, `dist` performs a distance based blending.
+
+    Returns
+    -------
+    Nothing
+    """
+    warp_net = warp_net.eval()
+
+    t1 = 0
+    t2 = 1
+    times = np.arange(t1, t2, (t2 - t1) / n_frames)
+    # grid = get_grid(frame_dims).to(device).requires_grad_(False)
+    grid = frame0.coords.clone().to(device).requires_grad_(False)
+    frameshape = (frame0.size[0], frame0.size[1], frame0.n_channels)
+
+    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"mp4v"),
+                          fps, frame0.size, True)
+
+    with torch.no_grad():
+        if isinstance(landmarks_src, torch.Tensor):
+            landmarks_src = landmarks_src.clone().detach()
+        else:
+            landmarks_src = torch.Tensor(landmarks_src).to(device).float()
+
+        if isinstance(landmarks_tgt, torch.Tensor):
+            landmarks_tgt = landmarks_tgt.clone().detach()
+        else:
+            landmarks_tgt = torch.Tensor(landmarks_tgt).to(device).float()
+
+        for t in times:
+            coords0 = warp_points(warp_net, grid, -t)
+            coords1 = warp_points(warp_net, grid, 1 - t)
+
+            rec0 = frame0.pixels(coords0).reshape(frameshape)
+            rec1 = frame1.pixels(coords1).reshape(frameshape)
+
+            rec = blend_frames(rec0, rec1, t, blending_type=blending_type)
+            rec = cv2.cvtColor(rec, cv2.COLOR_RGB2BGR)
+            cv2.putText(
+                img=rec, text='Time = %.2f' % (t.item()), org=(0, 30),
+                fontFace=cv2.FONT_HERSHEY_TRIPLEX, fontScale=0.5,
+                color=(255, 255, 255), thickness=1
+            )
+
+            if plot_landmarks:
+                warped_src = list(
+                    warp_points(warp_net, landmarks_src, t).detach().cpu().numpy()
+                )
+                warped_tgt = list(
+                    warp_points(warp_net, landmarks_tgt, t - 1).detach().cpu().numpy()
+                )
+                for (point_tgt, point_src) in zip(warped_tgt, warped_src):
+                    norm_src = (int(frame0.size[1]*(point_src[1]+1)/2),
+                                int(frame0.size[0]*(point_src[0]+1)/2))
+                    norm_tgt = (int(frame1.size[1]*(point_tgt[1]+1)/2),
+                                int(frame1.size[0]*(point_tgt[0]+1)/2))
+                    rec = cv2.circle(
+                        rec, norm_src, radius=1, color=(255, 0, 0), thickness=-1
+                    )
+                    rec = cv2.circle(
+                        rec, norm_tgt, radius=1, color=(0, 255, 0), thickness=-1
+                    )
+
+            out.write(rec)
+    out.release()
 
 def grid_image(coords):
     N = 8
