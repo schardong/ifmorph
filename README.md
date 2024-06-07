@@ -41,7 +41,8 @@ On the repository root, we stored most of the experiment scripts needed to repro
 * `morph-train.py` - trains a network for morphing(blending) two initial states and a (neural) warping (_very volatile_)
 * `warp-inference-image.py` - runs the inference of a pretrained face warping network, outputs an image, or series of images
 * `warp-inference-vid.py` - runs the inference of a pretrained face warping network, outputs a video
-* `warp-train.py` - trains a network for face landmark warping between two initial states
+* `warp-train-continuous.py` - trains a network for face landmark warping between two continuous initial states (a.k.a. two neural networs)
+* `warp-train-discrete.py` - same as above, but with discrete images (PNG, JPG, etc.)
 
 Inside the `standalone` folder, we've stored scripts that are related, but not necessarily essential to run the experiments. These are:
 * `create-experiment-files.py` - given a list of pairs, image paths and landmarks, creates the corresponding experiment files
