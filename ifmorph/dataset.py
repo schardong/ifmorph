@@ -150,14 +150,16 @@ class ImageDataset(Dataset):
             intcoords = (self.coords.detach().clone().cpu() * 0.5 + 0.5)
         else:
             intcoords = (coords.detach().clone().cpu() * 0.5 + 0.5)
-        intcoords = intcoords.clamp(-1, 1)
+        intcoords = intcoords.clamp(self.coords.min(), self.coords.max())
         intcoords[..., 0] *= self.size[0]
         intcoords[..., 1] *= self.size[1]
         intcoords = intcoords.floor().long()
-        return self.rgb[
+        rgb = torch.zeros_like(self.rgb, device=self.device)
+        rgb = self.rgb[
             (intcoords[..., 0] * self.size[0]) + intcoords[..., 1],
             ...
         ]
+        return rgb
 
     def __len__(self):
         return math.ceil(self.rgb.shape[0] / self.batch_size)
