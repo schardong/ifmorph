@@ -8,3 +8,4 @@ experiments/frll_neutral_front_cropped/*
 .vscode/
 data/frll_neutral_front_cropped
 data/frll_neutral_front
+.venv

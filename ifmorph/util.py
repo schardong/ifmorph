@@ -90,7 +90,9 @@ def get_grid(dims, requires_grad=False, list_of_coords=True):
     """
     if isinstance(dims, int):
         dims = [dims]
-    tensors = tuple([torch.linspace(-1, 1, steps=d) for d in dims])
+    tensors = tuple([
+        torch.linspace(-1+(1.0/d), 1-(1.0/d), steps=d) for d in dims
+    ])
     mgrid = torch.stack(torch.meshgrid(*tensors, indexing="ij"), dim=-1)
     if list_of_coords:
         mgrid = mgrid.reshape(-1, len(dims))
@@ -436,7 +438,6 @@ def create_morphing_video(
         frame_dims: tuple,
         n_frames: int,
         fps: int,
-        ic_times: list,
         device: torch.device,
         src,
         tgt,
@@ -466,9 +467,6 @@ def create_morphing_video(
 
     fps: int
         Frames-per-second of the video.
-
-    ic_times: list
-        The times of the initial conditions.
 
     device: torch.device
         The device to run the inference for all networks. All intermediate

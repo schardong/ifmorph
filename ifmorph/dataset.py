@@ -134,21 +134,35 @@ class ImageDataset(Dataset):
         else:
             self.batch_size = batch_size
 
-    def pixels(self, coords):
+    def pixels(self, coords=None):
         """
         Parameters
         ----------
         coords: torch.Tensor
-            Point tensor in range [-1, 1]. Must have shape Nx2.
+            Point tensor in range [-1, 1]. Must have shape [N, 2].
+
+        Returns
+        -------
+        rgb: torch.Tensor
+            RGB values shaped [N, 3].
         """
-        intcoords = coords.detach().clone().cpu() * 0.5 + 0.5
+        if coords is None:
+            intcoords = (self.coords.detach().clone().cpu() * 0.5 + 0.5)
+        else:
+            intcoords = (coords.detach().clone().cpu() * 0.5 + 0.5)
+        intcoords = intcoords.clamp(self.coords.min(), self.coords.max())
         intcoords[..., 0] *= self.size[0]
         intcoords[..., 1] *= self.size[1]
-        intcoords = intcoords.long()
-        return self.rgb[intcoords[..., 0] * intcoords[..., 1], ...]
+        intcoords = intcoords.floor().long()
+        rgb = torch.zeros_like(self.rgb, device=self.coords.device)
+        rgb = self.rgb[
+            (intcoords[..., 0] * self.size[0]) + intcoords[..., 1],
+            ...
+        ]
+        return rgb
 
     def __len__(self):
-        return self.rgb.shape[0] // self.batch_size
+        return math.ceil(self.rgb.shape[0] / self.batch_size)
 
     def __getitem__(self, idx=None):
         """
@@ -173,6 +187,7 @@ class ImageDataset(Dataset):
             idx = torch.randint(self.coords.shape[0], (self.batch_size,))
         elif not isinstance(idx, torch.Tensor):
             idx = torch.Tensor(idx)
+        idx = idx.to(self.coords.device)
         return self.coords[idx, ...], self.rgb[idx, ...], idx
 
 
@@ -397,28 +412,21 @@ class NoTimeWarpingDataset(WarpingDataset):
 
 
 if __name__ == "__main__":
-    wd = DiscreteImageWarpingDataset(
-        [("data/frll_neutral_front/001_03.jpg", 0.0), ("data/frll_neutral_front/002_03.jpg", 1.0)],
-        20
-    )
-    print(wd.batch_size, wd.im_batch_size)
-    pts = wd.__getitem__(None)
+    import torchvision.transforms.functional as F
+    # wd = DiscreteImageWarpingDataset(
+    #     [("data/frll_neutral_front/001_03.jpg", 0.0), ("data/frll_neutral_front/002_03.jpg", 1.0)],
+    #     20
+    # )
+    # print(wd.batch_size, wd.im_batch_size)
+    # pts = wd.__getitem__(None)
 
-    # im = ImageDataset("data/frll_neutral_front/001_03.jpg", batch_size=30)
-    # X, y = im.__getitem__(None)
-    # print(X.shape, y.shape)
-    # X, y = im.__getitem__([])
-    # print(X.shape, y.shape)
-    # X, y = im.__getitem__()
-    # print(X.shape, y.shape)
+    im = ImageDataset("data/001_03.jpg", batch_size=0)
+    idx = torch.arange(im.rgb.shape[0])
+    X, y, _ = im.__getitem__(idx)
+    print(X.shape, y.shape)
 
-    # idx = torch.randint(100, (im.batch_size,))
-    # X, y = im.__getitem__(idx)
-    # print(X.shape, y.shape)
-    # data = WarpingDataset([
-    #     ("pretrained/yaleB01_P00A+000E+00.pth", -0.5),
-    #     ("pretrained/yaleB11_P00A+000E+00.pth", 0.0),
-    #     ("pretrained/yaleB27_P00A+000E+00.pth", 0.5)
-    # ], 48)
-    # X = data[0]
-    # print(X.shape)
+    pix = im.pixels()  # y.detach().clone()
+    rgb = pix.reshape([im.size[0], im.size[1], 3]).permute((2, 0, 1))
+    rgb = F.to_pil_image(rgb)
+    rgb.save("test.png")
+

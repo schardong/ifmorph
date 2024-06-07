@@ -14,10 +14,10 @@ import pandas as pd
 import torch
 from torch.utils.tensorboard import SummaryWriter
 import yaml
-from ifmorph.dataset import WarpingDataset
+from ifmorph.dataset import DiscreteImageWarpingDataset
 from ifmorph.loss_functions import FeatureMatchingWarpingLoss
 from ifmorph.model import SIREN
-from ifmorph.util import (create_morphing_video, return_points_morph,
+from ifmorph.util import (discrete_morphing_video, return_points_morph,
                           return_points_morph_mediapipe)
 
 
@@ -77,7 +77,7 @@ def train_warping(experiment_config_path, output_path, args):
     device = torch.device(devstr)
 
     initial_conditions = [(v, k) for k, v in config["initial_conditions"].items()]
-    data = WarpingDataset(
+    data = DiscreteImageWarpingDataset(
         initial_conditions,
         num_samples=config["training"]["n_samples"],
         device=device
@@ -242,18 +242,17 @@ def train_warping(experiment_config_path, output_path, args):
             model = model.eval()
             vidpath = osp.join(output_path, f"rec_{step}.mp4")
             with torch.no_grad():
-                create_morphing_video(
+                discrete_morphing_video(
                     warp_net=model,
-                    shape_net0=data.initial_states[0],
-                    shape_net1=data.initial_states[1],
+                    frame0=data.initial_states[0],
+                    frame1=data.initial_states[1],
                     output_path=vidpath,
-                    frame_dims=grid_dims,
                     n_frames=n_frames,
                     fps=fps,
                     device=device,
-                    src=src,
-                    tgt=tgt,
-                    plot_landmarks=False
+                    landmarks_src=src,
+                    landmarks_tgt=tgt,
+                    plot_landmarks=True
                 )
             print("Inference done.")
             model = model.train().to(device)
@@ -288,17 +287,16 @@ def train_warping(experiment_config_path, output_path, args):
         print("Running the inference.")
 
         vidpath = osp.join(output_path, "video.mp4")
-        create_morphing_video(
+        discrete_morphing_video(
             warp_net=model,
-            shape_net0=data.initial_states[0],
-            shape_net1=data.initial_states[1],
+            frame0=data.initial_states[0],
+            frame1=data.initial_states[1],
             output_path=vidpath,
-            frame_dims=grid_dims,
             n_frames=n_frames,
             fps=fps,
             device=device,
-            src=src,
-            tgt=tgt
+            landmarks_src=src,
+            landmarks_tgt=tgt
         )
         print("Inference done.")
 
