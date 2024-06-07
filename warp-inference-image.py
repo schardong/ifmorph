@@ -11,10 +11,10 @@ import cv2
 import numpy as np
 import torch
 import yaml
-from ifmorph.dataset import check_network_type
+from ifmorph.dataset import check_network_type, ImageDataset, NotTorchFile
 from ifmorph.model import from_pth
 from ifmorph.util import (get_grid, blend_frames, plot_landmarks,
-                          warped_shapenet_inference, warp_points)
+                          warp_shapenet_inference, warp_points)
 
 WITH_MRNET = True
 try:
@@ -41,30 +41,6 @@ if __name__ == "__main__":
         "--landmarks", "-l", default=False, action="store_true",
         help="Whether to overlay the source/target landmarks on the resulting"
         " images."
-    )
-    parser.add_argument(
-        "--rots", default=0, type=int, help="Rotation angles (in degrees) to"
-        " apply to the source image."
-    )
-    parser.add_argument(
-        "--rott", default=0, type=int, help="Rotation angles (in degrees) to"
-        " apply to the target image."
-    )
-    parser.add_argument(
-        "--tsx", default=0, type=float, help="Translation of X coordinate in"
-        " the source image."
-    )
-    parser.add_argument(
-        "--tsy", default=0, type=float, help="Translation of F coordinate in"
-        " the source image."
-    )
-    parser.add_argument(
-        "--ttx", default=0, type=float, help="Translation of X coordinate in"
-        " the target image."
-    )
-    parser.add_argument(
-        "--tty", default=0, type=float, help="Translation of Y coordinate in"
-        " the target image."
     )
     parser.add_argument(
         "--device", "-d", default="cuda:0",
@@ -127,15 +103,21 @@ if __name__ == "__main__":
     model = from_pth(modelpath, w0=warping_omega0, ww=warping_omegaW,
                      device=device)
 
-    shapenets = [None] * len(config["initial_conditions"])
+    initialstates = [None] * len(config["initial_conditions"])
+    is_discrete = False
     for i, p in enumerate(config["initial_conditions"].values()):
-        nettype = check_network_type(p)
-        if nettype == "siren":
-            shapenets[i] = from_pth(p, w0=1, device=device)
-        elif nettype == "mrnet" and WITH_MRNET:
-            shapenets[i] = MRFactory.load_state_dict(p).to(device)
+        try:
+            nettype = check_network_type(p)
+        except NotTorchFile:
+            initialstates[i] = ImageDataset(p)
+            is_discrete = True
         else:
-            raise ValueError(f"Unknown network type: {nettype}")
+            if nettype == "siren":
+                initialstates[i] = from_pth(p, w0=1, device=device)
+            elif nettype == "mrnet" and WITH_MRNET:
+                initialstates[i] = MRFactory.load_state_dict(p).to(device)
+            else:
+                raise ValueError(f"Unknown network type: {nettype}")
 
     imbasename = f"frame_{args.checkpoint}" + "_{}"
     if args.landmarks:
@@ -144,40 +126,43 @@ if __name__ == "__main__":
     baseimpath = osp.join(osp.expanduser(args.outputdir), imbasename)
 
     reconstruct_config = config["reconstruct"]
-    if args.framedims:
-        grid_dims = [int(d) for d in args.framedims]
+    if is_discrete:
+        grid_dims = initialstates[0].size
+        print(grid_dims)
     else:
-        grid_dims = reconstruct_config.get("frame_dims", [640, 640])
+        if args.framedims:
+            grid_dims = [int(d) for d in args.framedims]
+        else:
+            grid_dims = reconstruct_config.get("frame_dims", [640, 640])
 
     if args.timesteps:
         timesteps = [float(t) for t in args.timesteps]
 
     blending_type = args.blending
-
     grid = get_grid(grid_dims).to(device).requires_grad_(False)
-    tgrid = torch.hstack(
-        (grid, torch.zeros((grid.shape[0], 1), device=device))
-    ).requires_grad_(False)
-
     for t in timesteps:
-        tgrid[..., -1] = -t
-        rec0, coords0 = warped_shapenet_inference(
-            tgrid, model, shapenets[0], grid_dims,
-            rot_angle=np.deg2rad(args.rots),
-            translation=[args.tsx, args.tsy],
-            bggray=255
-        )
+        if is_discrete:
+            coords0 = warp_points(model, grid, -t)
+            coords1 = warp_points(model, grid, 1-t)
 
-        tgrid[..., -1] = 1 - t
-        rec1, coords1 = warped_shapenet_inference(
-            tgrid, model, shapenets[1], grid_dims,
-            rot_angle=np.deg2rad(args.rott),
-            translation=[args.ttx, args.tty],
-            bggray=255
-        )
+            rec0 = initialstates[0].pixels(coords0)
+            rec0 = rec0.reshape([
+                grid_dims[0], grid_dims[1], initialstates[0].n_channels
+            ])
+            rec1 = initialstates[1].pixels(coords1)
+            rec1 = rec1.reshape([
+                grid_dims[0], grid_dims[1], initialstates[1].n_channels
+            ])
+        else:
+            rec0, coords0 = warp_shapenet_inference(
+                grid, -t, model, initialstates[0], grid_dims, bggray=255
+            )
+
+            rec1, coords1 = warp_shapenet_inference(
+                grid, 1-t, model, initialstates[1], grid_dims, bggray=255
+            )
 
         frame = blend_frames(rec0, rec1, t, blending_type)
-
         if args.landmarks:
             color = None
             lms = None

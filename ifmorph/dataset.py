@@ -17,6 +17,19 @@ except (ModuleNotFoundError, ImportError):
     WITH_MRNET = False
 
 
+class NotTorchFile(Exception):
+    """Exception raised when we try to `torch.load` an invalid file.
+
+    Parameters
+    ----------
+    message: str
+        Error explanation.
+    """
+    def __init__(self, message="File is not torch loadable."):
+        self.message = message
+        super().__init__(self.message)
+
+
 def check_network_type(state_dict_path):
     """Returns the type of network stored in `state_dict_path`.
 
@@ -31,8 +44,16 @@ def check_network_type(state_dict_path):
         Returns "siren" or "mrnet" according to the network type stored in the
         input file. Note that we assume it will be either a SIREN of one of the
         MRNet type networks, so we don't really check for other types here.
+
+    Raises
+    ------
+    NotTorchFile indicating that the input file is not a network, but
+    something else.
     """
-    sd = torch.load(state_dict_path, map_location="cpu")
+    try:
+        sd = torch.load(state_dict_path, map_location="cpu")
+    except Exception:
+        raise NotTorchFile()
     return "mrnet" if "stages" in sd else "siren"
 
 
@@ -429,4 +450,3 @@ if __name__ == "__main__":
     rgb = pix.reshape([im.size[0], im.size[1], 3]).permute((2, 0, 1))
     rgb = F.to_pil_image(rgb)
     rgb.save("test.png")
-

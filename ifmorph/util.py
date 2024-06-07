@@ -234,16 +234,19 @@ def batched_predict(model: torch.nn.Module, coord_arr: torch.Tensor,
     return preds
 
 
-def warped_shapenet_inference(
-        grid_with_t, warpnet, shapenet, framedims, rot_angle=0,
-        translation=(0, 0), bggray=0
+def warp_shapenet_inference(
+        grid, t, warpnet, shapenet, framedims, bggray=0
 ):
     """Performs the inference on a `warpnet` and feeds the results to a
     `shapenet`, normalizing the areas out-of-domain.
 
     Parameters
     ----------
-    grid_with_t: torch.Tensor
+    grid: torch.Tensor
+        [N, 2] tensor of points to be warped and used for `shapenet` inference.
+
+    t: float
+        Parameter in [-1, 1] range to warp the points in `grid`.
 
     warpnet: torch.nn.Module
         A network that performs the warping of coordinates in `grid_with_t`.
@@ -267,23 +270,18 @@ def warped_shapenet_inference(
     coords: torch.Tensor
         The warped coordinates used as input for `shapenet`.
     """
-    coords = warpnet(grid_with_t)["model_out"].detach()
-    if any(translation):
-        coords -= -torch.tensor(translation).to(device=coords.device)
-    if rot_angle:
-        coords_copy = coords.clone()
-        cos = torch.cos(torch.tensor(rot_angle))
-        sin = torch.sin(torch.tensor(rot_angle))
-        coords[:, 0] = cos * coords_copy[:, 0] + sin * coords_copy[:, 1]
-        coords[:, 1] = -sin * coords_copy[:, 0] + cos * coords_copy[:, 1]
-
+    coords = warp_points(warpnet, grid, t)
     img = shapenet(coords)["model_out"].detach().clamp(0, 1) * 255
     # restrict to the image domain [-1,1]^2
     img = torch.where(
-        torch.abs(coords[..., 0].unsqueeze(-1)) < 1.0, img, torch.full_like(img, bggray)
+        torch.abs(coords[..., 0].unsqueeze(-1)) < 1.0,
+        img,
+        torch.full_like(img, bggray)
     )
     img = torch.where(
-        torch.abs(coords[..., 1].unsqueeze(-1)) < 1.0, img, torch.full_like(img, bggray)
+        torch.abs(coords[..., 1].unsqueeze(-1)) < 1.0,
+        img,
+        torch.full_like(img, bggray)
     )
     img = img.reshape([framedims[0], framedims[1], shapenet.out_features])
     return img, coords
@@ -292,15 +290,15 @@ def warped_shapenet_inference(
 def warp_points(
         model: torch.nn.Module, points: torch.Tensor, t: float
 ) -> torch.Tensor:
-    """Warps `points` by parameter `t` \in [-1, 1] using `model`.
+    """Warps `points` by parameter `t` in range [-1, 1] using `model`.
 
     Parameters
     ----------
     model: torch.nn.Module
-        A warping network with input Nx3.
+        A warping network that maps [N, 3] points to [N, 2] points.
 
     points: torch.Tensor
-        Nx2 tensor of points to be warped.
+        [N, 2] tensor of points to be warped.
 
     t: number
         Parameter in [-1, 1] range to warp the points.
@@ -354,7 +352,9 @@ def plot_landmarks(im: np.array, lm: np.array, c=(0, 255, 0), r=3) -> np.array:
     return imc
 
 
-def blend_frames(f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: str) -> np.array:
+def blend_frames(
+        f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: str
+) -> np.array:
     """Blends frames `f1` and `f2` following `blending_type`.
 
     Parameters
@@ -439,12 +439,10 @@ def create_morphing_video(
         n_frames: int,
         fps: int,
         device: torch.device,
-        src,
-        tgt,
+        landmark_src,
+        landmark_tgt,
         plot_landmarks=True,
-        blending_type="linear",
-        angles=(0, 0),
-        translations=[[0, 0], [0, 0]]
+        blending_type="linear"
 ):
     """Creates a video file given a model and output path.
 
@@ -472,10 +470,10 @@ def create_morphing_video(
         The device to run the inference for all networks. All intermediate
         tensors will be allocated with this device option.
 
-    src: torch.Tensor
+    landmark_src: torch.Tensor
         Warping source points
 
-    tgt: torch.Tensor
+    landmark_tgt: torch.Tensor
         Warping target points
 
     plot_landmarks: boolean, optional
@@ -487,12 +485,7 @@ def create_morphing_video(
         (default), which performs a linear interpolation of the states.
         "minimum" and "maximum" get minimum(maximum) color values between the
         inferences of `shape_net0` and `shape_net1` at the warped coordinates.
-        Finally, `dist` performs a distance based blending...
-
-    angles: tuple, optional
-        The rotation angles (in degrees) to apply to the source (angles[0]) and
-         target (angles[1]) images. Useful for robustness test. By default its
-        (0, 0), meaning no rotation applied to the images.
+        Finally, `dist` performs a distance based blending.
 
     Returns
     -------
@@ -513,31 +506,22 @@ def create_morphing_video(
                           frame_dims[::-1], True)
 
     with torch.no_grad():
-        if isinstance(src, torch.Tensor):
-            src = src.clone().detach()
+        if isinstance(landmark_src, torch.Tensor):
+            landmark_src = landmark_src.clone().detach()
         else:
-            src = torch.tensor(src, device=device, dtype=torch.float32)
+            landmark_src = torch.Tensor(landmark_src).to(device).float()
 
-        if isinstance(tgt, torch.Tensor):
-            tgt = tgt.clone().detach()
+        if isinstance(landmark_tgt, torch.Tensor):
+            landmark_tgt = landmark_tgt.clone().detach()
         else:
-            tgt = torch.tensor(tgt, device=device, dtype=torch.float32)
-
-        tgrid = torch.hstack(
-            (grid, torch.zeros((grid.shape[0], 1), device=device))
-        ).requires_grad_(False)
+            landmark_tgt = torch.Tensor(landmark_tgt).to(device).float()
 
         for t in times:
-            tgrid[..., -1] = -t
-            rec0, _ = warped_shapenet_inference(
-                tgrid, warp_net, shape_net0, frame_dims, rot_angle=angles[0],
-                translation=translations[0]
+            rec0, _ = warp_shapenet_inference(
+                grid, -t, warp_net, shape_net0, frame_dims
             )
-
-            tgrid[..., -1] = 1 - t
-            rec1, _ = warped_shapenet_inference(
-                tgrid, warp_net, shape_net1, frame_dims, rot_angle=angles[1],
-                translation=translations[1]
+            rec1, _ = warp_shapenet_inference(
+                grid, 1-t, warp_net, shape_net1, frame_dims
             )
 
             rec = blend_frames(rec0, rec1, t, blending_type=blending_type)
@@ -550,10 +534,10 @@ def create_morphing_video(
 
             if plot_landmarks:
                 warped_src = list(
-                    warp_points(warp_net, src, t).detach().cpu().numpy()
+                    warp_points(warp_net, landmark_src, t).detach().cpu().numpy()
                 )
                 warped_tgt = list(
-                    warp_points(warp_net, tgt, t - 1).detach().cpu().numpy()
+                    warp_points(warp_net, landmark_tgt, t - 1).detach().cpu().numpy()
                 )
                 for (point_tgt, point_src) in zip(warped_tgt, warped_src):
                     norm_src = (int(frame_dims[1]*(point_src[1]+1)/2),
@@ -584,7 +568,7 @@ def discrete_morphing_video(
         plot_landmarks=True,
         blending_type="linear"
 ):
-    """Creates a video file given a model and output path.
+    """Creates a video file given a model, initial frames and output path.
 
     Parameters
     ----------
@@ -691,6 +675,7 @@ def discrete_morphing_video(
 
             out.write(rec)
     out.release()
+
 
 def grid_image(coords):
     N = 8
