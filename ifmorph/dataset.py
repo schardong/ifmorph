@@ -154,7 +154,7 @@ class ImageDataset(Dataset):
         intcoords[..., 0] *= self.size[0]
         intcoords[..., 1] *= self.size[1]
         intcoords = intcoords.floor().long()
-        rgb = torch.zeros_like(self.rgb, device=self.device)
+        rgb = torch.zeros_like(self.rgb, device=self.coords.device)
         rgb = self.rgb[
             (intcoords[..., 0] * self.size[0]) + intcoords[..., 1],
             ...
