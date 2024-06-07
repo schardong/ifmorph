@@ -438,7 +438,6 @@ def create_morphing_video(
         frame_dims: tuple,
         n_frames: int,
         fps: int,
-        ic_times: list,
         device: torch.device,
         src,
         tgt,
@@ -468,9 +467,6 @@ def create_morphing_video(
 
     fps: int
         Frames-per-second of the video.
-
-    ic_times: list
-        The times of the initial conditions.
 
     device: torch.device
         The device to run the inference for all networks. All intermediate

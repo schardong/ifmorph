@@ -116,7 +116,7 @@ def train_warping(experiment_config_path, output_path, args):
         reconstruct_steps = training_config.get("reconstruction_steps", None)
 
     reconstruct_config = config["reconstruct"]
-    timerange = reconstruct_config.get("timerange", [-1, 1])
+    # timerange = reconstruct_config.get("timerange", [-1, 1])
     n_frames = reconstruct_config.get("n_frames", 100)
     fps = reconstruct_config.get("fps", 10)
     grid_dims = reconstruct_config.get("frame_dims", (320, 320))
