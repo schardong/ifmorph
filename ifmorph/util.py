@@ -90,7 +90,9 @@ def get_grid(dims, requires_grad=False, list_of_coords=True):
     """
     if isinstance(dims, int):
         dims = [dims]
-    tensors = tuple([torch.linspace(-1, 1, steps=d) for d in dims])
+    tensors = tuple([
+        torch.linspace(-1+(1.0/d), 1-(1.0/d), steps=d) for d in dims
+    ])
     mgrid = torch.stack(torch.meshgrid(*tensors, indexing="ij"), dim=-1)
     if list_of_coords:
         mgrid = mgrid.reshape(-1, len(dims))

@@ -90,18 +90,14 @@ if __name__ == "__main__":
             nepochs = config["training"].get("n_steps", 1000)
 
     for fname in args.images:
-        img = ImageDataset(fname, channels_to_use=n_channels)
-        X, y = img[0]
-        X = X.detach().to(device).requires_grad_(False)
-        y = y.detach().to(device).requires_grad_(False)
-        steps_per_epoch = 1
-        batchsize = X.shape[0] if not args.batchsize else args.batchsize
-        if args.batchsize:
-            steps_per_epoch = math.ceil(X.shape[0] / args.batchsize)
+        img = ImageDataset(
+            fname, channels_to_use=n_channels, batch_size=args.batchsize
+        )
+        steps_per_epoch = len(img)
 
         if not args.silent:
             print(f"Training for image: \"{fname}\" -- Epochs: {nepochs}"
-                  f" -- Batch size: {batchsize}"
+                  f" -- Batch size: {img.batch_size}"
                   f" -- Steps per epoch {steps_per_epoch}")
 
         model.update_omegas(
@@ -119,12 +115,14 @@ if __name__ == "__main__":
         best_weights = {}
         best_epoch = 0
         for epoch in range(nepochs):
-            idx = torch.randperm(X.shape[0], device=device)
             epochloss = 0
             for step in range(steps_per_epoch):
-                idxslice = idx[step * batchsize:(step + 1) * batchsize]
-                yhat = model(X[idxslice, ...], preserve_grad=True)["model_out"]
-                loss = torch.pow(y[idxslice, ...] - yhat, 2).sum(1).mean()
+                X, y, idx = img.__getitem__()
+                X = X.detach().to(device).requires_grad_(False)
+                y = y.detach().to(device).requires_grad_(False)
+                yhat = model(X, preserve_grad=True)["model_out"]
+                loss = torch.pow(y - yhat, 2).sum(1).mean()
+
                 epochloss += loss.item()
                 optim.zero_grad()
                 loss.backward()
@@ -152,16 +150,20 @@ if __name__ == "__main__":
         if not args.no_reconstruction:
             model.eval()
             with torch.no_grad():
-                idx = torch.arange(X.shape[0], device=device)
-                rec = torch.zeros_like(y, device=device).requires_grad_(False)
+                idx = torch.arange(img.rgb.shape[0], device=device)
+                rec = torch.zeros_like(img.rgb, device=device).requires_grad_(False)
                 for step in range(steps_per_epoch):
-                    idxslice = idx[step * args.batchsize:(step + 1) * args.batchsize]
-                    y[idxslice, ...] = model(X[idxslice, ...])["model_out"].detach()
+                    idxslice = idx[step * img.batch_size:(step + 1) * img.batch_size]
+                    X, _, _ = img.__getitem__(idxslice)
+                    X = X.detach().to(device).requires_grad_(False)
+                    yhat = model(X, preserve_grad=True)["model_out"]
+                    rec[idxslice, ...] = yhat
 
-                rec = y.detach().cpu().clip(0, 1).requires_grad_(False)
+                rec = rec.detach().cpu().clip(0, 1).requires_grad_(False)
 
             sz = [img.size[0], img.size[1], n_channels]
-            img = to_pil_image(rec.reshape(sz).permute(2, 0, 1))
+            rec = rec.reshape(sz).permute((2, 0, 1))
+            img = to_pil_image(rec)
             out_img_path = osp.join(output_path, out_basename + ".png")
             img.save(out_img_path)
             print(f"Image saved as: {out_img_path}")
