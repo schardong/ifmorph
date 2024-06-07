@@ -150,10 +150,14 @@ class ImageDataset(Dataset):
             intcoords = (self.coords.detach().clone().cpu() * 0.5 + 0.5)
         else:
             intcoords = (coords.detach().clone().cpu() * 0.5 + 0.5)
+        intcoords = intcoords.clamp(-1, 1)
         intcoords[..., 0] *= self.size[0]
         intcoords[..., 1] *= self.size[1]
         intcoords = intcoords.floor().long()
-        return self.rgb[(intcoords[..., 0] * self.size[0]) + intcoords[..., 1], ...]
+        return self.rgb[
+            (intcoords[..., 0] * self.size[0]) + intcoords[..., 1],
+            ...
+        ]
 
     def __len__(self):
         return math.ceil(self.rgb.shape[0] / self.batch_size)
@@ -423,18 +427,4 @@ if __name__ == "__main__":
     rgb = pix.reshape([im.size[0], im.size[1], 3]).permute((2, 0, 1))
     rgb = F.to_pil_image(rgb)
     rgb.save("test.png")
-    # X, y = im.__getitem__([])
-    # print(X.shape, y.shape)
-    # X, y = im.__getitem__()
-    # print(X.shape, y.shape)
 
-    # idx = torch.randint(100, (im.batch_size,))
-    # X, y = im.__getitem__(idx)
-    # print(X.shape, y.shape)
-    # data = WarpingDataset([
-    #     ("pretrained/yaleB01_P00A+000E+00.pth", -0.5),
-    #     ("pretrained/yaleB11_P00A+000E+00.pth", 0.0),
-    #     ("pretrained/yaleB27_P00A+000E+00.pth", 0.5)
-    # ], 48)
-    # X = data[0]
-    # print(X.shape)
