@@ -374,64 +374,6 @@ class DiscreteImageWarpingDataset(Dataset):
         return X
 
 
-class NoTimeWarpingDataset(WarpingDataset):
-    """Warping dataset that doesn't return time coordinates.
-
-    Parameters
-    ----------
-    initial_states: list[tuples[number, torch.nn.Module]]
-        A list of initial states (known images), and the time of each image.
-        Note that the time should be in range [-1, 1]. And we will only sample
-        in the time-range given here, i.e., if this parameter is
-        [(-0.5, ...), (0.8, ...)], we will only sample values in range
-        [-0.5, 0.8].
-
-    num_samples: int
-        Number of samples to draw at every call to __getitem__. Note that half
-        of the samples will be drawn at the initial states (evenly distributed
-        between them), and the other half will be drawn at intermediate times.
-
-    device: str, torch.Device, optional
-        The device to store the read models. By default is cpu.
-
-    time_range: list, optional
-        Will sample points in this time_range independently from the timerange
-        in `initial_states`.
-
-    grid_sampling: boolean, optional
-        Set to `True` (default) to sample points in a grid, distributed
-        uniformely along time, or `False` to randomly sample points in the
-        [-1, 1] domain.
-
-    Examples
-    --------
-    > # Creating a dataset with 3 initial states at times -0.8, 0.4 and 0.95,
-    > # all on CPU. We will fetch 1000 points per call to __getitem__.
-    > initial_states = [("m1.pth", -0.8), ("m2.pth", 0.4), ("m3.pth", 0.95)]
-    > data = NoTimeWarpingDataset(initial_states, 1000, torch.device("cpu"))
-    > X, y = data[0]
-    > print(X.shape, y.shape)  # Should print something like: [1000, 3], [1000]
-    """
-    def __init__(self, initial_states: list, num_samples: int,
-                 device: str = "cpu", grid_sampling: bool = True):
-        super(NoTimeWarpingDataset, self).__init__(
-            initial_states, num_samples, device, grid_sampling
-        )
-
-    def __getitem__(self, _):
-        """
-        Returns
-        -------
-        X: torch.Tensor
-            A [`num_samples`, 3] shaped tensor with the pixel coordinates at
-            the first two columns, and time coordinates at the last column.
-        """
-        # Spatial coordinates
-        N = self.num_samples // 2
-        coords = torch.rand((N, 2), device=self.device) * 2 - 1
-        return coords
-
-
 if __name__ == "__main__":
     import torchvision.transforms.functional as F
     # wd = DiscreteImageWarpingDataset(

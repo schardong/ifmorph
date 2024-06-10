@@ -15,7 +15,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 import yaml
 from ifmorph.dataset import WarpingDataset
-from ifmorph.loss_functions import FeatureMatchingWarpingLoss
+from ifmorph.loss_functions import WarpingLoss
 from ifmorph.model import SIREN
 from ifmorph.util import (create_morphing_video, return_points_morph,
                           return_points_morph_mediapipe)
@@ -175,7 +175,7 @@ def train_warping(experiment_config_path, output_path, args):
         loss_config["targets"] = tgt.detach().clone().cpu().numpy().tolist()
         loss_config["noise_scale"] = args.noise_scale
 
-        loss_func = FeatureMatchingWarpingLoss(
+        loss_func = WarpingLoss(
             warp_src_pts=src,
             warp_tgt_pts=tgt,
             intermediate_times=int_times,
