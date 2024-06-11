@@ -116,7 +116,6 @@ def train_warping(experiment_config_path, output_path, args):
         reconstruct_steps = training_config.get("reconstruction_steps", None)
 
     reconstruct_config = config["reconstruct"]
-    # timerange = reconstruct_config.get("timerange", [-1, 1])
     n_frames = reconstruct_config.get("n_frames", 100)
     fps = reconstruct_config.get("fps", 10)
     grid_dims = reconstruct_config.get("frame_dims", (320, 320))
@@ -125,64 +124,61 @@ def train_warping(experiment_config_path, output_path, args):
     best_step = warmup_steps
     training_loss = {}
 
-    if loss_config["type"] == "featurematching":
-        src, tgt = None, None
-        if "sources" not in loss_config or "targets" not in loss_config:
-            src, tgt, _, _ = return_points_morph_mediapipe(
-                data.initial_states[0],
-                data.initial_states[1],
-                grid_dims,
-                device=device,
-            )
-        elif isinstance(loss_config["sources"], str) or \
-             isinstance(loss_config["targets"], str):
-            with open(loss_config["sources"], 'r') as fin:
-                src = np.array(yaml.safe_load(fin))
-
-            with open(loss_config["targets"], 'r') as fin:
-                tgt = np.array(yaml.safe_load(fin))
-        else:
-            src = np.array(loss_config["sources"])
-            tgt = np.array(loss_config["targets"])
-
-        if not args.no_ui:
-            src, tgt, _, _ = return_points_morph(
-                data.initial_states[0],
-                data.initial_states[1],
-                grid_dims,
-                src_pts=src,
-                tgt_pts=tgt,
-                device=device,
-                run_mediapipe=False
-            )
-
-        int_times = loss_config.get("intermediate_times", [0.25, 0.5, 0.75])
-        constraint_weights = loss_config.get("constraint_weights", None)
-
-        for k, v in constraint_weights.items():
-            constraint_weights[k] = float(v)
-
-        src = torch.tensor(src, dtype=torch.float32).to(device)
-        tgt = torch.tensor(tgt, dtype=torch.float32).to(device)
-        if args.noise_scale:
-            print(f"Running with landmark noise: {args.noise_scale}")
-            noisesrc = (2 * torch.rand_like(src) - 1) * args.noise_scale
-            noisetgt = (2 * torch.rand_like(tgt) - 1) * args.noise_scale
-            src = src + noisesrc
-            tgt = tgt + noisetgt
-
-        loss_config["sources"] = src.detach().clone().cpu().numpy().tolist()
-        loss_config["targets"] = tgt.detach().clone().cpu().numpy().tolist()
-        loss_config["noise_scale"] = args.noise_scale
-
-        loss_func = WarpingLoss(
-            warp_src_pts=src,
-            warp_tgt_pts=tgt,
-            intermediate_times=int_times,
-            constraint_weights=constraint_weights
+    src, tgt = None, None
+    if "sources" not in loss_config or "targets" not in loss_config:
+        src, tgt, _, _ = return_points_morph_mediapipe(
+            data.initial_states[0],
+            data.initial_states[1],
+            grid_dims,
+            device=device,
         )
+    elif isinstance(loss_config["sources"], str) or \
+         isinstance(loss_config["targets"], str):
+        with open(loss_config["sources"], 'r') as fin:
+            src = np.array(yaml.safe_load(fin))
+
+        with open(loss_config["targets"], 'r') as fin:
+            tgt = np.array(yaml.safe_load(fin))
     else:
-        raise NotImplementedError("Only \"featurematching\" loss is supported.")
+        src = np.array(loss_config["sources"])
+        tgt = np.array(loss_config["targets"])
+
+    if not args.no_ui:
+        src, tgt, _, _ = return_points_morph(
+            data.initial_states[0],
+            data.initial_states[1],
+            grid_dims,
+            src_pts=src,
+            tgt_pts=tgt,
+            device=device,
+            run_mediapipe=False
+        )
+
+    int_times = loss_config.get("intermediate_times", [0.25, 0.5, 0.75])
+    constraint_weights = loss_config.get("constraint_weights", None)
+
+    for k, v in constraint_weights.items():
+        constraint_weights[k] = float(v)
+
+    src = torch.tensor(src, dtype=torch.float32).to(device)
+    tgt = torch.tensor(tgt, dtype=torch.float32).to(device)
+    if args.noise_scale:
+        print(f"Running with landmark noise: {args.noise_scale}")
+        noisesrc = (2 * torch.rand_like(src) - 1) * args.noise_scale
+        noisetgt = (2 * torch.rand_like(tgt) - 1) * args.noise_scale
+        src = src + noisesrc
+        tgt = tgt + noisetgt
+
+    loss_config["sources"] = src.detach().clone().cpu().numpy().tolist()
+    loss_config["targets"] = tgt.detach().clone().cpu().numpy().tolist()
+    loss_config["noise_scale"] = args.noise_scale
+
+    loss_func = WarpingLoss(
+        warp_src_pts=src,
+        warp_tgt_pts=tgt,
+        intermediate_times=int_times,
+        constraint_weights=constraint_weights
+    )
 
     config["loss"] = loss_config
     with open(osp.join(output_path, "config.yaml"), "w") as fout:
