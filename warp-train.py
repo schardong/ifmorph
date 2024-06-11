@@ -160,18 +160,11 @@ def train_warping(experiment_config_path, output_path, args):
     for k, v in constraint_weights.items():
         constraint_weights[k] = float(v)
 
-    src = torch.tensor(src, dtype=torch.float32).to(device)
-    tgt = torch.tensor(tgt, dtype=torch.float32).to(device)
-    if args.noise_scale:
-        print(f"Running with landmark noise: {args.noise_scale}")
-        noisesrc = (2 * torch.rand_like(src) - 1) * args.noise_scale
-        noisetgt = (2 * torch.rand_like(tgt) - 1) * args.noise_scale
-        src = src + noisesrc
-        tgt = tgt + noisetgt
+    src = torch.Tensor(src).float().to(device)
+    tgt = torch.Tensor(tgt).float().to(device)
 
     loss_config["sources"] = src.detach().clone().cpu().numpy().tolist()
     loss_config["targets"] = tgt.detach().clone().cpu().numpy().tolist()
-    loss_config["noise_scale"] = args.noise_scale
 
     loss_func = WarpingLoss(
         warp_src_pts=src,
@@ -331,12 +324,6 @@ if __name__ == "__main__":
         help="Optional output path to store experimental results. By default"
         " we use the experiment filename and create a matching directory"
         " under folder \"results\"."
-    )
-    parser.add_argument(
-        "--noise-scale", "-s", default=0, type=float,
-        help="The scale of the noise to apply to the landmark points. Defaults"
-        " to 0, meaning no noise is to be applied. Passing 1 will result in"
-        " completely random points."
     )
     parser.add_argument(
         "--no-ui", "-n", action="store_true", default=False,
