@@ -11,7 +11,7 @@ import torch
 import yaml
 from ifmorph.dataset import check_network_type, ImageDataset, NotTorchFile
 from ifmorph.model import from_pth
-from ifmorph.util import create_morphing_video, discrete_morphing_video
+from ifmorph.util import create_morphing
 
 WITH_MRNET = True
 try:
@@ -91,13 +91,11 @@ if __name__ == "__main__":
                      device=device)
 
     initialstates = [None] * len(config["initial_conditions"])
-    is_discrete = False
     for i, p in enumerate(config["initial_conditions"].values()):
         try:
             nettype = check_network_type(p)
         except NotTorchFile:
             initialstates[i] = ImageDataset(p)
-            is_discrete = True
         else:
             if nettype == "siren":
                 initialstates[i] = from_pth(p, w0=1, device=device)
@@ -123,32 +121,19 @@ if __name__ == "__main__":
 
     morph_sources = torch.Tensor(config["loss"]["sources"]).float().to(device)
     morph_targets = torch.Tensor(config["loss"]["targets"]).float().to(device)
-    if is_discrete:
-        discrete_morphing_video(
-            warp_net=model,
-            frame0=initialstates[0],
-            frame1=initialstates[1],
-            output_path=vidpath,
-            n_frames=n_frames, fps=fps, device=device,
-            landmarks_src=morph_sources,
-            landmarks_tgt=morph_targets,
-            plot_landmarks=args.landmarks,
-            blending_type=args.blending
-        )
-    else:
-        create_morphing_video(
-            warp_net=model,
-            shape_net0=initialstates[0],
-            shape_net1=initialstates[1],
-            output_path=vidpath,
-            frame_dims=grid_dims,
-            n_frames=n_frames,
-            fps=fps,
-            device=device,
-            landmark_src=morph_sources,
-            landmark_tgt=morph_targets,
-            plot_landmarks=args.landmarks,
-            blending_type=args.blending,
-        )
+    create_morphing(
+        warp_net=model,
+        frame0=initialstates[0],
+        frame1=initialstates[1],
+        output_path=vidpath,
+        frame_dims=grid_dims,
+        n_frames=n_frames,
+        fps=fps,
+        device=device,
+        landmark_src=morph_sources,
+        landmark_tgt=morph_targets,
+        plot_landmarks=args.landmarks,
+        blending_type=args.blending,
+    )
 
     print(f"Output video written to \"{vidpath}\"")

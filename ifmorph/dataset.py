@@ -186,7 +186,12 @@ class ImageDataset(Dataset):
         return math.ceil(self.rgb.shape[0] / self.batch_size)
 
     def __getitem__(self, idx=None):
-        """
+        """Returns the coordinates, RGB values and indices of pixels in image.
+
+        Given a list of pixel indices `idx` returns their normalized
+        coordinates, RGB values and their indices as well. If the list is not
+        given (default), it will be generated and returned.
+
         Parameters
         ----------
         idx: list or torch.Tensor, optional
@@ -202,14 +207,15 @@ class ImageDataset(Dataset):
             on the number of channels of the input image.
 
         idx: torch.Tensor
-            Indices of the pixels returned.
+            Indices of the pixels selected. If the `idx` parameter is provided,
+            it will simply by a copy of it.
         """
         if idx is None or not len(idx):
-            idx = torch.randint(self.coords.shape[0], (self.batch_size,))
+            iidx = torch.randint(self.coords.shape[0], (self.batch_size,))
         elif not isinstance(idx, torch.Tensor):
-            idx = torch.Tensor(idx)
-        idx = idx.to(self.coords.device)
-        return self.coords[idx, ...], self.rgb[idx, ...], idx
+            iidx = torch.Tensor(idx)
+        iidx = iidx.to(self.coords.device)
+        return self.coords[iidx, ...], self.rgb[iidx, ...], iidx
 
 
 class WarpingDataset(Dataset):
@@ -241,7 +247,7 @@ class WarpingDataset(Dataset):
     --------
     > # Creating a dataset with 3 initial states at times -0.8, 0.4 and 0.95,
     > # all on CPU. We will fetch 1000 points per call to __getitem__.
-    > initial_states = [("m1.pth", -0.8), ("m2.pth", 0.4), ("m3.pth", 0.95)]
+    > initial_states = [("m1.pth", -0.8), ("m2.pth", 0.4), "(m3.pth", 0.95)]
     > data = WarpingDataset(initial_states, 1000, torch.device("cpu"))
     > X = data[0]
     > print(X.shape)  # Should print something like: [1000, 3]
@@ -256,16 +262,23 @@ class WarpingDataset(Dataset):
         self.known_times = [None] * len(initial_states)
         self.time_range = [-1.0, 1.0]
         for i, (state_path, t) in enumerate(initial_states):
-            if check_network_type(state_path) == "siren":
-                self.initial_states[i] = from_pth(
-                    state_path, w0=1, device=device
+            try:
+                nettype = check_network_type(state_path)
+            except NotTorchFile:
+                self.initial_states[i] = ImageDataset(
+                    state_path, batch_size=self.num_samples // 4
                 )
             else:
-                if WITH_MRNET:
-                    net = MRFactory.load_state_dict(state_path)
-                    self.initial_states[i] = net.to(device)
+                if nettype == "siren":
+                    self.initial_states[i] = from_pth(
+                        state_path, w0=1, device=device
+                    )
                 else:
-                    raise NoMrnetError()
+                    if WITH_MRNET:
+                        net = MRFactory.load_state_dict(state_path)
+                        self.initial_states[i] = net.to(device)
+                    else:
+                        raise NoMrnetError()
             self.known_times[i] = t
 
         # Spatial coordinates
@@ -309,68 +322,6 @@ class WarpingDataset(Dataset):
             (X, torch.hstack((self.coords, int_times.unsqueeze(1)))),
             dim=0
         )
-        return X
-
-
-class DiscreteImageWarpingDataset(Dataset):
-    """A Warping dataset that uses discrete images in place of neural images.
-
-    Parameters
-    ----------
-    initial_states: list[Str, PathLike]
-        Paths to the images
-
-    num_samples: int
-        Number of samples to draw at each call to `__getitem__`
-
-    device: str, torch.device
-    """
-    def __init__(self, initial_states: list, num_samples: int,
-                 device: str = "cpu"):
-        super(DiscreteImageWarpingDataset, self).__init__()
-        self.device = device
-        self.batch_size = num_samples
-        # Half the samples will be on the initial states. Thus, each initial
-        # state must have a quarter of the total samples.
-        self.im_batch_size = num_samples // 4
-        self.initial_states = [None] * len(initial_states)
-        self.known_times = [None] * len(initial_states)
-        self.time_range = [-1.0, 1.0]
-        for i, (state_path, t) in enumerate(initial_states):
-            self.initial_states[i] = ImageDataset(
-                state_path, batch_size=self.im_batch_size
-            )
-            self.known_times[i] = t
-
-    def __len__(self):
-        return 1
-
-    def __getitem__(self, _):
-        """
-        Returns
-        -------
-        X: torch.Tensor
-            A [`num_samples`, 3] shaped tensor with the pixel coordinates at
-            the first two columns, and time coordinates at the last column.
-        """
-        # Half of the samples are on the initial states, as explained above.
-        N = self.batch_size // 2
-
-        # Temporal coordinates \in (0, 1), renormalized to the actual time
-        # ranges of the initial conditions.
-        t1, t2 = self.time_range
-        int_times = torch.rand(N, device=self.device) * (t2 - t1) + t1
-
-        coords, _, _ = self.initial_states[0].__getitem__(None)
-        coords = coords.to(self.device)
-        tcol = torch.cat((
-            torch.Tensor([self.known_times[0]] * int(math.floor(N / 2))).to(self.device),
-            int_times,
-            torch.Tensor([self.known_times[1]] * int(math.ceil(N / 2))).to(self.device)
-        ))
-        X = torch.cat((
-            torch.cat([coords] * 4, dim=0), tcol.unsqueeze(-1)
-        ), dim=1)
         return X
 
 

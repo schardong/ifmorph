@@ -430,10 +430,10 @@ def blend_frames(
     return rec
 
 
-def create_morphing_video(
+def create_morphing(
         warp_net: torch.nn.Module,
-        shape_net0: torch.nn.Module,
-        shape_net1: torch.nn.Module,
+        frame0: torch.nn.Module,
+        frame1: torch.nn.Module,
         output_path: str,
         frame_dims: tuple,
         n_frames: int,
@@ -450,12 +450,11 @@ def create_morphing_video(
     ----------
     warp_net: torch.nn.Module
         The warping model. It must be a coordinate model with three
-        inputs (u, v, t), where u, v range in [-1, 1] and t is the time, which
-        may have the same range as u, v, and is given by the `time_range`
-        parameter.
+        inputs (u, v, t), where u, v, t are in range[-1, 1]. u, v are spatial
+        coordinates, while t is the time.
 
     output_path: str, PathLike
-        Output path to the video generated.
+        Output path to save the generated video.
 
     frame_dims: tuple of ints
         The (width, height) of each video frame.
@@ -464,17 +463,17 @@ def create_morphing_video(
         The number of frames in the final video.
 
     fps: int
-        Frames-per-second of the video.
+        Frames-per-second of the output video.
 
     device: torch.device
         The device to run the inference for all networks. All intermediate
         tensors will be allocated with this device option.
 
     landmark_src: torch.Tensor
-        Warping source points
+        Warping source landmark.
 
     landmark_tgt: torch.Tensor
-        Warping target points
+        Warping target landmarks.
 
     plot_landmarks: boolean, optional
         Switch to plot the warping points over the video (if True), or not
@@ -492,8 +491,14 @@ def create_morphing_video(
     Nothing
     """
     warp_net = warp_net.eval()
-    shape_net0 = shape_net0.eval()
-    shape_net1 = shape_net1.eval()
+    continuousp = False
+
+    # If the frames are continuous images (i.e. SIRENs), we must set them to
+    # "eval" mode.
+    if isinstance(frame0, torch.nn.Module):
+        frame0 = frame0.eval()
+        frame1 = frame1.eval()
+        continuousp = True
 
     t1 = 0
     t2 = 1
@@ -517,12 +522,20 @@ def create_morphing_video(
             landmark_tgt = torch.Tensor(landmark_tgt).to(device).float()
 
         for t in times:
-            rec0, _ = warp_shapenet_inference(
-                grid, -t, warp_net, shape_net0, frame_dims
-            )
-            rec1, _ = warp_shapenet_inference(
-                grid, 1-t, warp_net, shape_net1, frame_dims
-            )
+            if continuousp:
+                rec0, _ = warp_shapenet_inference(
+                    grid, -t, warp_net, frame0, frame_dims
+                )
+                rec1, _ = warp_shapenet_inference(
+                    grid, 1-t, warp_net, frame1, frame_dims
+                )
+            else:
+                rec0 = frame0.pixels(
+                    warp_points(warp_net, grid, -t)
+                ).reshape([frame_dims[0], frame_dims[1], frame0.n_channels])
+                rec1 = frame1.pixels(
+                    warp_points(warp_net, grid, 1 - t)
+                ).reshape([frame_dims[0], frame_dims[1], frame1.n_channels])
 
             rec = blend_frames(rec0, rec1, t, blending_type=blending_type)
             rec = cv2.cvtColor(rec, cv2.COLOR_RGB2BGR)
@@ -544,128 +557,6 @@ def create_morphing_video(
                                 int(frame_dims[0]*(point_src[0]+1)/2))
                     norm_tgt = (int(frame_dims[1]*(point_tgt[1]+1)/2),
                                 int(frame_dims[0]*(point_tgt[0]+1)/2))
-                    rec = cv2.circle(
-                        rec, norm_src, radius=1, color=(255, 0, 0), thickness=-1
-                    )
-                    rec = cv2.circle(
-                        rec, norm_tgt, radius=1, color=(0, 255, 0), thickness=-1
-                    )
-
-            out.write(rec)
-    out.release()
-
-
-def discrete_morphing_video(
-        warp_net: torch.nn.Module,
-        frame0: torch.utils.data.Dataset,
-        frame1: torch.utils.data.Dataset,
-        output_path: str,
-        n_frames: int,
-        fps: int,
-        device: torch.device,
-        landmarks_src,
-        landmarks_tgt,
-        plot_landmarks=True,
-        blending_type="linear"
-):
-    """Creates a video file given a model, initial frames and output path.
-
-    Parameters
-    ----------
-    warp_net: torch.nn.Module
-        The warping model. It must be a coordinate model with three
-        inputs (u, v, t), where u, v range in [-1, 1] and t is the time, which
-        may have the same range as u, v, and is given by the `time_range`
-        parameter.
-
-    frame0: ifmorph.dataset.ImageDataset
-
-    frame1: ifmorph.dataset.ImageDataset
-
-    output_path: str, PathLike
-        Output path to the video generated.
-
-    n_frames: int
-        The number of frames in the final video.
-
-    fps: int
-        Frames-per-second of the video.
-
-    device: torch.device
-        The device to run the inference for all networks. All intermediate
-        tensors will be allocated with this device option.
-
-    landmarks_src: torch.Tensor
-        Warping source points
-
-    landmarks_tgt: torch.Tensor
-        Warping target points
-
-    plot_landmarks: boolean, optional
-        Switch to plot the warping points over the video (if True), or not
-        (if False, default behaviour)
-
-    blending_type: str, optional
-        How to perform the blending of the initial states, may be "linear"
-        (default), which performs a linear interpolation of the states.
-        "minimum" and "maximum" get minimum(maximum) color values between the
-        inferences of `shape_net0` and `shape_net1` at the warped coordinates.
-        Finally, `dist` performs a distance based blending.
-
-    Returns
-    -------
-    Nothing
-    """
-    warp_net = warp_net.eval()
-
-    t1 = 0
-    t2 = 1
-    times = np.arange(t1, t2, (t2 - t1) / n_frames)
-    # grid = get_grid(frame_dims).to(device).requires_grad_(False)
-    grid = frame0.coords.clone().to(device).requires_grad_(False)
-    frameshape = (frame0.size[0], frame0.size[1], frame0.n_channels)
-
-    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"mp4v"),
-                          fps, frame0.size, True)
-
-    with torch.no_grad():
-        if isinstance(landmarks_src, torch.Tensor):
-            landmarks_src = landmarks_src.clone().detach()
-        else:
-            landmarks_src = torch.Tensor(landmarks_src).to(device).float()
-
-        if isinstance(landmarks_tgt, torch.Tensor):
-            landmarks_tgt = landmarks_tgt.clone().detach()
-        else:
-            landmarks_tgt = torch.Tensor(landmarks_tgt).to(device).float()
-
-        for t in times:
-            coords0 = warp_points(warp_net, grid, -t)
-            coords1 = warp_points(warp_net, grid, 1 - t)
-
-            rec0 = frame0.pixels(coords0).reshape(frameshape)
-            rec1 = frame1.pixels(coords1).reshape(frameshape)
-
-            rec = blend_frames(rec0, rec1, t, blending_type=blending_type)
-            rec = cv2.cvtColor(rec, cv2.COLOR_RGB2BGR)
-            cv2.putText(
-                img=rec, text='Time = %.2f' % (t.item()), org=(0, 30),
-                fontFace=cv2.FONT_HERSHEY_TRIPLEX, fontScale=0.5,
-                color=(255, 255, 255), thickness=1
-            )
-
-            if plot_landmarks:
-                warped_src = list(
-                    warp_points(warp_net, landmarks_src, t).detach().cpu().numpy()
-                )
-                warped_tgt = list(
-                    warp_points(warp_net, landmarks_tgt, t - 1).detach().cpu().numpy()
-                )
-                for (point_tgt, point_src) in zip(warped_tgt, warped_src):
-                    norm_src = (int(frame0.size[1]*(point_src[1]+1)/2),
-                                int(frame0.size[0]*(point_src[0]+1)/2))
-                    norm_tgt = (int(frame1.size[1]*(point_tgt[1]+1)/2),
-                                int(frame1.size[0]*(point_tgt[0]+1)/2))
                     rec = cv2.circle(
                         rec, norm_src, radius=1, color=(255, 0, 0), thickness=-1
                     )

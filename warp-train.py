@@ -17,7 +17,7 @@ import yaml
 from ifmorph.dataset import WarpingDataset
 from ifmorph.loss_functions import WarpingLoss
 from ifmorph.model import SIREN
-from ifmorph.util import (create_morphing_video, return_points_morph,
+from ifmorph.util import (create_morphing, return_points_morph,
                           return_points_morph_mediapipe)
 
 
@@ -242,17 +242,17 @@ def train_warping(experiment_config_path, output_path, args):
             model = model.eval()
             vidpath = osp.join(output_path, f"rec_{step}.mp4")
             with torch.no_grad():
-                create_morphing_video(
+                create_morphing(
                     warp_net=model,
-                    shape_net0=data.initial_states[0],
-                    shape_net1=data.initial_states[1],
+                    frame0=data.initial_states[0],
+                    frame1=data.initial_states[1],
                     output_path=vidpath,
                     frame_dims=grid_dims,
                     n_frames=n_frames,
                     fps=fps,
                     device=device,
-                    src=src,
-                    tgt=tgt,
+                    landmark_src=src,
+                    landmark_tgt=tgt,
                     plot_landmarks=False
                 )
             print("Inference done.")
@@ -274,7 +274,6 @@ def train_warping(experiment_config_path, output_path, args):
 
         model.w0 = network_config["omega_0"]
         model.ww = network_config["omega_w"]
-        print(model.w0, model.ww)
         model.load_state_dict(best_weights)
         model.update_omegas(w0=1, ww=None)
         torch.save(
@@ -288,17 +287,17 @@ def train_warping(experiment_config_path, output_path, args):
         print("Running the inference.")
 
         vidpath = osp.join(output_path, "video.mp4")
-        create_morphing_video(
+        create_morphing(
             warp_net=model,
-            shape_net0=data.initial_states[0],
-            shape_net1=data.initial_states[1],
+            frame0=data.initial_states[0],
+            frame1=data.initial_states[1],
             output_path=vidpath,
             frame_dims=grid_dims,
             n_frames=n_frames,
             fps=fps,
             device=device,
-            src=src,
-            tgt=tgt
+            landmark_src=src,
+            landmark_tgt=tgt,
         )
         print("Inference done.")
 

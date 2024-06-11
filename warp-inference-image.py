@@ -8,7 +8,6 @@ import argparse
 import os
 import os.path as osp
 import cv2
-import numpy as np
 import torch
 import yaml
 from ifmorph.dataset import check_network_type, ImageDataset, NotTorchFile
@@ -104,13 +103,13 @@ if __name__ == "__main__":
                      device=device)
 
     initialstates = [None] * len(config["initial_conditions"])
-    is_discrete = False
+    discretep = False
     for i, p in enumerate(config["initial_conditions"].values()):
         try:
             nettype = check_network_type(p)
         except NotTorchFile:
             initialstates[i] = ImageDataset(p)
-            is_discrete = True
+            discretep = True
         else:
             if nettype == "siren":
                 initialstates[i] = from_pth(p, w0=1, device=device)
@@ -126,7 +125,7 @@ if __name__ == "__main__":
     baseimpath = osp.join(osp.expanduser(args.outputdir), imbasename)
 
     reconstruct_config = config["reconstruct"]
-    if is_discrete:
+    if discretep:
         grid_dims = initialstates[0].size
         print(grid_dims)
     else:
@@ -141,7 +140,7 @@ if __name__ == "__main__":
     blending_type = args.blending
     grid = get_grid(grid_dims).to(device).requires_grad_(False)
     for t in timesteps:
-        if is_discrete:
+        if discretep:
             coords0 = warp_points(model, grid, -t)
             coords1 = warp_points(model, grid, 1-t)
 
