@@ -327,19 +327,13 @@ class WarpingDataset(Dataset):
 
 if __name__ == "__main__":
     import torchvision.transforms.functional as F
-    # wd = DiscreteImageWarpingDataset(
-    #     [("data/frll_neutral_front/001_03.jpg", 0.0), ("data/frll_neutral_front/002_03.jpg", 1.0)],
-    #     20
-    # )
-    # print(wd.batch_size, wd.im_batch_size)
-    # pts = wd.__getitem__(None)
 
     im = ImageDataset("data/001_03.jpg", batch_size=0)
     idx = torch.arange(im.rgb.shape[0])
     X, y, _ = im.__getitem__(idx)
     print(X.shape, y.shape)
 
-    pix = im.pixels()  # y.detach().clone()
+    pix = im.pixels()
     rgb = pix.reshape([im.size[0], im.size[1], 3]).permute((2, 0, 1))
     rgb = F.to_pil_image(rgb)
     rgb.save("test.png")

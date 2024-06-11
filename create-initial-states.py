@@ -5,7 +5,6 @@
 
 import argparse
 from copy import deepcopy
-import math
 import os
 import os.path as osp
 import yaml
