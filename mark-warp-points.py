@@ -16,7 +16,7 @@ from ifmorph.model import from_pth
 from ifmorph.util import get_landmark_correspondences
 
 
-DEFAULT_FLOW_CONFIG = {
+DEFAULT_WARPING_CONFIG = {
     "description": "warping_with_feature_matching",
     "device": "cuda:0",
     "experiment_name": "",
@@ -34,7 +34,7 @@ DEFAULT_FLOW_CONFIG = {
         "type": "featurematching"
     },
     "network": {
-        "hidden_layers": [156, 156],
+        "hidden_layers": [128, 128],
         "in_channels": 3,
         "out_channels": 2,
         "omega_0": 24,
@@ -183,7 +183,7 @@ if __name__ == "__main__":
               file=sys.stderr)
 
     if config is None:
-        config = DEFAULT_FLOW_CONFIG
+        config = DEFAULT_WARPING_CONFIG
 
     config["initial_conditions"] = {
         "0": pathsrc,
