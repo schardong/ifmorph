@@ -2,13 +2,13 @@
 
 import math
 import os.path as osp
+import sys
 import cv2
 import dlib
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import mediapipe as mp
-from ifmorph.point_editor import get_mediapipe_coord_dict
 from ifmorph.point_editor import FaceInteractor
 
 mp_face_mesh = mp.solutions.face_mesh
@@ -100,7 +100,7 @@ def get_grid(dims, requires_grad=False, list_of_coords=True):
     return mgrid
 
 
-def get_silhouette_lm(img, method="mediapipe"):
+def get_silhouette_lm(img, method="dlib"):
     """Returns the silhouette landmarks from `img` in pixel coordinates.
 
     Parameters
@@ -109,8 +109,7 @@ def get_silhouette_lm(img, method="mediapipe"):
         The input image with shape [H, W, C] with value range in [0, 255].
 
     method: str, optional
-        The face detection/landmark method to use. May be either "mediapipe"
-        (default), or "dlib".
+        The face detection/landmark method to use. Only accepts "dlib" for now.
 
     Returns
     -------
@@ -119,19 +118,7 @@ def get_silhouette_lm(img, method="mediapipe"):
         space.
     """
     landmarks = []
-    if method == "mediapipe":
-        sillhoueteidx = get_mediapipe_coord_dict()["silhouette"]
-        face_mesh = mp_face_mesh.FaceMesh(
-            static_image_mode=True,
-            min_detection_confidence=0.75
-        )
-        mesh = face_mesh.process(img)
-        landmarks = mesh.multi_face_landmarks[0].landmark
-        landmarks_list = [[landmark.x, landmark.y] for landmark in landmarks]
-        landmarks = np.array(landmarks_list)[sillhoueteidx]
-        landmarks[:, 0] *= img.shape[0]
-        landmarks[:, 1] *= img.shape[1]
-    elif method == "dlib":
+    if method == "dlib":
         coord_dict = get_dlib_coord_dict()
         maskpts = coord_dict["sillhouete"]
         maskpts.extend(coord_dict["left_eyebrow"][::-1])
@@ -620,9 +607,11 @@ def get_landmarks(face_mesh, img):
     larndmarks_np = np.array(landmarks_list)
 
     dict_face = {
-        'silhouette': [10,  338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
-                       397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
-                       172, 58,  132, 93,  234, 127, 162, 21,  54,  103, 67,  109],
+        'silhouette': [
+            10,  338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+            397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+            172, 58,  132, 93,  234, 127, 162, 21,  54,  103, 67,  109
+        ],
 
         'lipsUpperOuter':  [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291],
         'lipsLowerOuter': [146, 91, 181, 84, 17, 314, 405, 321, 375, 291],
@@ -673,74 +662,111 @@ def get_landmarks(face_mesh, img):
     return larndmarks_np[list_final]
 
 
-def return_points_morph_mediapipe(shape_net_src, shape_net_tgt, frame_dims,
-                                  device="cuda:0"):
-    shape_net_src = shape_net_src.eval()
-    shape_net_tgt = shape_net_tgt.eval()
-    n_channels = shape_net_src.out_features
+def get_landmark_correspondences(frame0, frame1, frame_dims,
+                                 src_pts=None, tgt_pts=None, device="cuda:0",
+                                 method=None, open_ui=True):
+    """Opens the `FaceInteractor` UI to get the landmark correspondences
+    between `frame0` and `frame1`.
 
-    grid = get_grid(frame_dims).to(device)
+    Its possible for this function to be a giant no-op if `method` is `None`
+    and `open_ui` is `False`, since the images will be resized (or, if
+    `frame{0,1}` are networks, their inference will be performed) and no
+    landmarks will be created. We test for this condition and return empty
+    lists if detected.
 
-    with torch.no_grad():
-        src_img = (shape_net_src(grid)["model_out"].detach().clamp(0, 1) * 255).cpu().reshape((frame_dims[0], frame_dims[1], n_channels)).squeeze().numpy().astype(np.uint8)
-        tgt_img = (shape_net_tgt(grid)["model_out"].detach().clamp(0, 1) * 255).cpu().reshape((frame_dims[0], frame_dims[1], n_channels)).squeeze().numpy().astype(np.uint8)
+    Parameters
+    ----------
+    frame0: torch.nn.Module or np.array
+        The source frame as a neural network or a discrete image.
 
-    face_mesh = mp_face_mesh.FaceMesh(
-        static_image_mode=True, min_detection_confidence=0.75
-    )
+    frame1: torch.nn.Module or np.array
+        The target frame as a neural network or a discrete image.
 
-    landmarks_src = get_landmarks(face_mesh, src_img)
-    landmarks_tgt = get_landmarks(face_mesh, tgt_img)
+    frame_dims: list[int, int]
+        The frame dimensions. If `frame{0,1}` are neural networks, we will
+        create a grid with frame_dims[0] rows and frame_dims[1] colunms to
+        perform the inference. If they are images, we will resize them before
+        opening performing the landmark detection or opening the UI.
 
-    # Need to return to original coordinates
-    landmarks_src = landmarks_src * 2 - 1
-    landmarks_tgt = landmarks_tgt * 2 - 1
+    src_pts: np.array, optional
+        Default is None
 
-    return (landmarks_src, landmarks_tgt, src_img, tgt_img)
+    tgt_pts: np.array, optional
+        Default is None
 
+    device: torch.device or str, optional
+        Only used if `frame0` or `frame1` are encoded as neural networks,
+        ignored otherwise. Default is "cuda:0".
 
-def return_points_morph_dlib(shape_net_src, shape_net_tgt, frame_dims,
-                             device="cuda:0"):
-    shape_net_src = shape_net_src.eval()
-    shape_net_tgt = shape_net_tgt.eval()
-    n_channels = shape_net_src.out_features
+    method: str, optional
+        The landmark detection method to use. Allowed values are None
+        (default), "" (same as None), "dlib", "mediapipe".
 
-    grid = get_grid(frame_dims).to(device)
+    open_ui: boolean, optional
+        Opens the `FaceInteractor` UI to allow landmark edition.
 
-    with torch.no_grad():
-        src_img = (shape_net_src(grid)["model_out"].detach().clamp(0, 1) * 255).cpu().reshape((frame_dims[0], frame_dims[1], n_channels)).squeeze().numpy().astype(np.uint8)
-        tgt_img = (shape_net_tgt(grid)["model_out"].detach().clamp(0, 1) * 255).cpu().reshape((frame_dims[0], frame_dims[1], n_channels)).squeeze().numpy().astype(np.uint8)
+    Returns
+    -------
+    landmark_src: np.array
+        The normalized landmarks for `frame0`, in range [-1, 1]
 
-    landmarks = [None, None]
-    for i, img in enumerate([src_img, tgt_img]):
-        landmarks[i] = get_landmarks_dlib(img).astype(float)
-        landmarks[i][:, 0] /= frame_dims[0]
-        landmarks[i][:, 1] /= frame_dims[1]
-        landmarks[i] = landmarks[i] * 2 - 1
+    landmark_tgt: np.array
+        The normalized landmarks for `frame1`, in range [-1, 1]
+    """
+    if method is None or not len(method) and not open_ui:
+        print(f"\"method\" is \"{method}\" and open_ui is False. This is an"
+              " expensive no-op. Bailing out.", file=sys.stderr)
+        return [], []
 
-    return (landmarks[0], landmarks[1], src_img, tgt_img)
-
-
-def return_points_morph(shape_net_src, shape_net_tgt, frame_dims,
-                        src_pts=None, tgt_pts=None, device="cuda:0",
-                        run_mediapipe=True):
-    shape_net_src = shape_net_src.eval()
-    shape_net_tgt = shape_net_tgt.eval()
-    dims = (frame_dims[0], frame_dims[1], shape_net_src.out_features)
-
+    dims = (frame_dims[0], frame_dims[1], 3)
     grid = get_grid(frame_dims, requires_grad=False).to(device)
-    with torch.no_grad():
-        src_img = (shape_net_src(grid)["model_out"].detach().clamp(0, 1) * 255).cpu().reshape(dims).numpy().astype(np.uint8)
-        tgt_img = (shape_net_tgt(grid)["model_out"].detach().clamp(0, 1) * 255).cpu().reshape(dims).numpy().astype(np.uint8)
+    if isinstance(frame0, torch.nn.Module):
+        frame0 = frame0.eval().to(device)
+        with torch.no_grad():
+            frame0 = frame0(grid)["model_out"].detach().clamp(0, 1) * 255
+            frame0 = frame0.cpu().reshape(dims).numpy().astype(np.uint8)
+    else:
+        frame0 = cv2.resize(frame0, frame_dims)
 
-        p = FaceInteractor(
-            src_img, tgt_img, src_pts=src_pts, tgt_pts=tgt_pts,
-        )
-        plt.show()
+    if isinstance(frame1, torch.nn.Module):
+        frame1 = frame1.eval().to(device)
+        with torch.no_grad():
+            frame1 = frame1(grid)["model_out"].detach().clamp(0, 1) * 255
+            frame1 = frame1.cpu().reshape(dims).numpy().astype(np.uint8)
+    else:
+        frame1 = cv2.resize(frame1, frame_dims)
 
-        src, tgt = p.return_points()
+    landmark_src, landmark_tgt = None, None
+    if method is not None and len(method):
+        if method == "dlib":
+            landmark_src = get_landmarks_dlib(frame0).astype(float)
+            print(landmark_src, frame_dims)
+            landmark_src[:, 0] /= frame_dims[0]
+            landmark_src[:, 1] /= frame_dims[1]
 
-    return (src, tgt, src_img, tgt_img)
+            landmark_tgt = get_landmarks_dlib(frame1).astype(float)
+            landmark_tgt[:, 0] /= frame_dims[0]
+            landmark_tgt[:, 1] /= frame_dims[1]
+        elif method == "mediapipe":
+            with mp_face_mesh.FaceMesh(
+                static_image_mode=True, min_detection_confidence=0.75
+            ) as fm:
+                landmark_src = get_landmarks(fm, frame0)
+                landmark_tgt = get_landmarks(fm, frame1)
+        else:
+            raise ValueError(f"Landmark method \"{method}\" not recognized."
+                             " Aborting.")
+
+        # Need to return to original coordinates
+        landmark_src = landmark_src * 2 - 1
+        landmark_tgt = landmark_tgt * 2 - 1
+
+    p = FaceInteractor(
+        frame0, frame1, src_pts=landmark_src, tgt_pts=landmark_tgt
+    )
+    plt.show()
+
+    return p.landmarks
 
 
 def test_mediapipe_landmark_detection(img):

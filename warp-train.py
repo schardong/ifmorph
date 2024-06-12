@@ -17,8 +17,7 @@ import yaml
 from ifmorph.dataset import WarpingDataset
 from ifmorph.loss_functions import WarpingLoss
 from ifmorph.model import SIREN
-from ifmorph.util import (create_morphing, return_points_morph,
-                          return_points_morph_mediapipe)
+from ifmorph.util import create_morphing, get_landmark_correspondences
 
 
 class LoggerType(Enum):
@@ -126,11 +125,12 @@ def train_warping(experiment_config_path, output_path, args):
 
     src, tgt = None, None
     if "sources" not in loss_config or "targets" not in loss_config:
-        src, tgt, _, _ = return_points_morph_mediapipe(
+        src, tgt, _, _ = get_landmark_correspondences(
             data.initial_states[0],
             data.initial_states[1],
             grid_dims,
             device=device,
+            open_ui=not args.no_ui
         )
     elif isinstance(loss_config["sources"], str) or \
          isinstance(loss_config["targets"], str):
@@ -142,17 +142,6 @@ def train_warping(experiment_config_path, output_path, args):
     else:
         src = np.array(loss_config["sources"])
         tgt = np.array(loss_config["targets"])
-
-    if not args.no_ui:
-        src, tgt, _, _ = return_points_morph(
-            data.initial_states[0],
-            data.initial_states[1],
-            grid_dims,
-            src_pts=src,
-            tgt_pts=tgt,
-            device=device,
-            run_mediapipe=False
-        )
 
     int_times = loss_config.get("intermediate_times", [0.25, 0.5, 0.75])
     constraint_weights = loss_config.get("constraint_weights", None)

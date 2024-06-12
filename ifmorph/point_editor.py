@@ -4,60 +4,6 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
-import mediapipe as mp
-mp_face_mesh = mp.solutions.face_mesh
-
-
-def get_mediapipe_coord_dict():
-    dict_face = {
-        'silhouette': [
-            10,  338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
-            397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
-            172, 58,  132, 93,  234, 127, 162, 21,  54,  103, 67,  109
-        ],
-
-        'lipsUpperOuter':  [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291],
-        'lipsLowerOuter': [146, 91, 181, 84, 17, 314, 405, 321, 375, 291],
-        'lipsUpperInner': [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308],
-        'lipsLowerInner': [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308],
-
-        'rightEyeUpper0': [246, 161, 160],#, 159, 158, 157, 173],
-        'rightEyeLower0': [33, 7, 163],#, 144, 145, 153, 154, 155, 133],
-        #rightEyeUpper1: [247, 30, 29, 27, 28, 56, 190],
-        #rightEyeLower1: [130, 25, 110, 24, 23, 22, 26, 112, 243],
-        #rightEyeUpper2: [113, 225, 224, 223, 222, 221, 189],
-        #rightEyeLower2: [226, 31, 228, 229, 230, 231, 232, 233, 244],
-        #rightEyeLower3: [143, 111, 117, 118, 119, 120, 121, 128, 245],
-
-        'rightEyebrowUpper': [156, 70, 63, 105, 66, 107, 55, 193],
-        #rightEyebrowLower: [35, 124, 46, 53, 52, 65],
-
-        #'rightEyeIris': [473, 474, 475, 476, 477],
-
-        'leftEyeUpper0': [466, 388, 387],#, 386, 385, 384, 398],
-        'leftEyeLower0': [263, 249, 390],# 373, 374, 380, 381, 382, 362],
-        #leftEyeUpper1: [467, 260, 259, 257, 258, 286, 414],
-        #leftEyeLower1: [359, 255, 339, 254, 253, 252, 256, 341, 463],
-        #leftEyeUpper2: [342, 445, 444, 443, 442, 441, 413],
-        #leftEyeLower2: [446, 261, 448, 449, 450, 451, 452, 453, 464],
-        #leftEyeLower3: [372, 340, 346, 347, 348, 349, 350, 357, 465],
-
-        'leftEyebrowUpper': [383, 300, 293, 334, 296, 336, 285, 417],
-        #leftEyebrowLower: [265, 353, 276, 283, 282, 295],
-
-        #'leftEyeIris': [468, 469, 470, 471, 472],
-
-        'midwayBetweenEyes': [168],
-
-        'noseTip': [1],
-        'noseBottom': [2],
-        'noseRightCorner': [98],
-        'noseLeftCorner': [327],
-
-        'rightCheek': [205],
-        'leftCheek': [425]
-    }
-    return dict_face
 
 
 def transform_display_coords(pts, frame_dims, is_tgt=False):
@@ -80,20 +26,20 @@ def convert_coord_disp2src(pt, frame_dims, is_tgt=False):
 
 
 def check_point_in_set(cursor_point, set_point, eps=15):
-    # print(set_point)
-    # print("cursor")
-    # print(cursor_point)
-    d = np.hypot(set_point[0] - cursor_point[0], set_point[1] - cursor_point[1])
+    d = np.hypot(
+        set_point[0] - cursor_point[0],
+        set_point[1] - cursor_point[1]
+    )
     indseq, = np.nonzero(d == d.min())
     ind = indseq[0]
 
     if d[ind] >= eps:
         # print(f'rejeito com distancia: {d[ind]}')
         ind = None
-    else:
+    # else:
         # print(f'aceito com distancia: {d[ind]}')
         # print(cursor_point)
-        print(set_point[0][ind], set_point[1][ind])
+        # print(set_point[0][ind], set_point[1][ind])
         # print("conjunto certo")
 
     return ind
@@ -101,27 +47,29 @@ def check_point_in_set(cursor_point, set_point, eps=15):
 
 class FaceInteractor:
     """
-    A polygon editor.
+    User-interface to mark/delete/edit landmark points on two faces.
+
+    The final list of landmarks can be retrieved by calling `return_points`.
 
     Parameters
     ----------
     src_img: np.ndarray
+        Source (leftmost) image
+
     tgt_img: np.ndarray
-    eps: int
+        Target (rightmost) image.
+
+    eps: int, optional
+        Tolerance value, for point operations (move/delete) in pixels. Default
+         value is 15 pixels.
+
     src_pts: list, optional
+        The source image landmarks. Optional, default is `None`.
+
     tgt_pts: list, optional
-
-    Key-bindings
-      't' toggle vertex markers on and off.  When vertex markers are on,
-          you can move them, delete them
-
-      'd' delete the vertex under point
-
-      'i' insert a vertex at point.  You must be within epsilon of the
-          line connecting two existing vertices
-
+        The target image landmarks. Optional, default is `None`.
     """
-    def __init__(self, src_img, tgt_img, eps=15, src_pts=None,
+    def __init__(self, src_img, tgt_img, eps: int = 15, src_pts=None,
                  tgt_pts=None):
         _, self.ax = plt.subplots()
         self.ax.set_title('Click and drag a point to move it')
@@ -141,7 +89,6 @@ class FaceInteractor:
 
         self.img_cat = np.concatenate([src_img, tgt_img], axis=1)
         self.frame_dims = (self.img_cat.shape[0], self.img_cat.shape[1]//2)
-        # print(self.frame_dims)
         self.sc_tgt = None
         self.sc_src = None
 
@@ -149,8 +96,9 @@ class FaceInteractor:
         self._ind_tgt, self._ind_src = None, None
         self.eps = eps
 
-        self.scatter_and_plot(self.landmarks_src, self.landmarks_tgt, self.frame_dims)
-        #canvas.mpl_connect('draw_event', self.on_draw)
+        self.scatter_and_plot(
+            self.landmarks_src, self.landmarks_tgt, self.frame_dims
+        )
         canvas.mpl_connect('button_press_event', self.on_button_press)
         canvas.mpl_connect('button_release_event', self.on_button_release)
         canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
@@ -281,7 +229,8 @@ class FaceInteractor:
             self.landmarks_src, self.landmarks_tgt, self.frame_dims
         )
 
-    def return_points(self):
+    @property
+    def landmarks(self):
         return (self.landmarks_src, self.landmarks_tgt)
 
 
@@ -300,7 +249,7 @@ if __name__ == '__main__':
     p = FaceInteractor(img1, img2)
     plt.show()
 
-    src, tgt = p.return_points()
+    src, tgt = p.landmarks
 
     print(src)
     print(tgt)
