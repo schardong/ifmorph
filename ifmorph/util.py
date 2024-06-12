@@ -385,13 +385,6 @@ def blend_frames(
         rec = torch.minimum(f1, f2)
     elif "max" in blending_type:
         rec = torch.maximum(f1, f2)
-    # elif "dist" in blending_type:
-    #     dist_0 = torch.sqrt(torch.sum((coords0[..., :2] - grid)**2, dim=-1)).unsqueeze(-1)
-    #     dist_1 = torch.sqrt(torch.sum((coords1[..., :2] - grid)**2, dim=-1)).unsqueeze(-1)
-    #     f1tmp = f1.reshape((dist_0.shape[0], shape_net0.out_features))
-    #     f2tmp = f2.reshape((dist_1.shape[0], shape_net1.out_features))
-    #     rec = (dist_1 * f1tmp + dist_0 * f2tmp) / (dist_0 + dist_1)
-    #     rec = rec.reshape(f1.shape).detach().cpu().numpy().astype(np.uint8)
     elif "src" in blending_type:
         rec = f1
     elif "tgt" in blending_type:
@@ -742,7 +735,6 @@ def return_points_morph(shape_net_src, shape_net_tgt, frame_dims,
 
         p = FaceInteractor(
             src_img, tgt_img, src_pts=src_pts, tgt_pts=tgt_pts,
-            run_mediapipe=run_mediapipe
         )
         plt.show()
 
