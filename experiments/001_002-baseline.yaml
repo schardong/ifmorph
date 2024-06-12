@@ -541,8 +541,8 @@ loss:
   type: featurematching
 network:
   hidden_layers:
-  - 156
-  - 156
+  - 128
+  - 128
   in_channels: 3
   omega_0: 24
   omega_w: 24
@@ -561,6 +561,6 @@ reconstruct:
 training:
   checkpoint_steps: 1000
   n_samples: 20000
-  n_steps: 21001
+  n_steps: 20001
   reconstruction_steps: 1000
   warmup_steps: 1000
