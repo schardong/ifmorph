@@ -60,7 +60,9 @@ if __name__ == "__main__":
         " [0, 1]."
     )
     parser.add_argument(
-        "--framedims", "-f", nargs='+', help=""
+        "--framedims", "-f", nargs='+', help="Dimensions (in pixels) for the"
+        " output image. Note that it must contain two numbers separated by a"
+        " space, e.g. \"-f 800 600\"."
     )
     parser.add_argument(
         "--blending", "-b", default="linear",

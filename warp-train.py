@@ -231,7 +231,7 @@ def train_warping(experiment_config_path, output_path, args):
                     device=device,
                     landmark_src=src,
                     landmark_tgt=tgt,
-                    plot_landmarks=False
+                    overlay_landmarks=False
                 )
             print("Inference done.")
             model = model.train().to(device)
@@ -276,6 +276,7 @@ def train_warping(experiment_config_path, output_path, args):
             device=device,
             landmark_src=src,
             landmark_tgt=tgt,
+            overlay_landmarks=True
         )
         print("Inference done.")
 

@@ -51,6 +51,11 @@ if __name__ == "__main__":
         " \"checkpoint_CHECKPOINT.pth\", unless the default value is kept."
     )
     parser.add_argument(
+        "--framedims", "-f", nargs='+', help="Dimensions (in pixels) for the"
+        " output image. Note that it must contain two numbers separated by a"
+        " space, e.g. \"-f 800 600\"."
+    )
+    parser.add_argument(
         "--blending", "-b", default="linear", type=str,
         help="The type of blending to use. May be any of \"linear\", \"min\","
         " \"max\", \"dist\", \"src\", \"tgt\", \"seamless_{clone,mix}\"."
@@ -90,12 +95,18 @@ if __name__ == "__main__":
     model = from_pth(modelpath, w0=warping_omega0, ww=warping_omegaW,
                      device=device)
 
+    reconstruct_config = config["reconstruct"]
+    if args.framedims:
+        grid_dims = [int(d) for d in args.framedims]
+    else:
+        grid_dims = reconstruct_config.get("frame_dims", [640, 640])
+
     initialstates = [None] * len(config["initial_conditions"])
     for i, p in enumerate(config["initial_conditions"].values()):
         try:
             nettype = check_network_type(p)
         except NotTorchFile:
-            initialstates[i] = ImageDataset(p)
+            initialstates[i] = ImageDataset(p, sidelen=grid_dims)
         else:
             if nettype == "siren":
                 initialstates[i] = from_pth(p, w0=1, device=device)
@@ -113,11 +124,9 @@ if __name__ == "__main__":
     else:
         vidpath = osp.join(args.outputdir, vidfilename)
 
-    reconstruct_config = config["reconstruct"]
     timerange = reconstruct_config.get("timerange", [-1, 1])
     n_frames = reconstruct_config.get("n_frames", 100)
     fps = reconstruct_config.get("fps", 10)
-    grid_dims = reconstruct_config.get("frame_dims", [320, 320])
 
     morph_sources = torch.Tensor(config["loss"]["sources"]).float().to(device)
     morph_targets = torch.Tensor(config["loss"]["targets"]).float().to(device)
@@ -132,7 +141,7 @@ if __name__ == "__main__":
         device=device,
         landmark_src=morph_sources,
         landmark_tgt=morph_targets,
-        plot_landmarks=args.landmarks,
+        overlay_landmarks=args.landmarks,
         blending_type=args.blending,
     )
 

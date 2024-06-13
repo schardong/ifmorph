@@ -423,7 +423,7 @@ def create_morphing(
         device: torch.device,
         landmark_src,
         landmark_tgt,
-        plot_landmarks=True,
+        overlay_landmarks=True,
         blending_type="linear"
 ):
     """Creates a video file given a model and output path.
@@ -457,7 +457,7 @@ def create_morphing(
     landmark_tgt: torch.Tensor
         Warping target landmarks.
 
-    plot_landmarks: boolean, optional
+    overlay_landmarks: boolean, optional
         Switch to plot the warping points over the video (if True), or not
         (if False, default behaviour)
 
@@ -527,23 +527,17 @@ def create_morphing(
                 color=(255, 255, 255), thickness=1
             )
 
-            if plot_landmarks:
-                warped_src = list(
-                    warp_points(warp_net, landmark_src, t).detach().cpu().numpy()
-                )
-                warped_tgt = list(
-                    warp_points(warp_net, landmark_tgt, t - 1).detach().cpu().numpy()
-                )
-                for (point_tgt, point_src) in zip(warped_tgt, warped_src):
-                    norm_src = (int(frame_dims[1]*(point_src[1]+1)/2),
-                                int(frame_dims[0]*(point_src[0]+1)/2))
-                    norm_tgt = (int(frame_dims[1]*(point_tgt[1]+1)/2),
-                                int(frame_dims[0]*(point_tgt[0]+1)/2))
-                    rec = cv2.circle(
-                        rec, norm_src, radius=1, color=(255, 0, 0), thickness=-1
-                    )
-                    rec = cv2.circle(
-                        rec, norm_tgt, radius=1, color=(0, 255, 0), thickness=-1
+            if overlay_landmarks:
+                for c, pts, ts in zip([(0, 0, 255), (0, 255, 0)], [landmark_src, landmark_tgt], [t, t-1]):
+                    rec = plot_landmarks(
+                        rec,
+                        warp_points(
+                            warp_net,
+                            torch.Tensor(pts).to(device).float(),
+                            ts
+                        ).detach().cpu().numpy(),
+                        c=c,
+                        r=1
                     )
 
             out.write(rec)
