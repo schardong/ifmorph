@@ -19,6 +19,18 @@ This is the official implementation of "Neural Implicit Morphing of Face Images"
 
 ## Getting started
 
+**TL-DR**: If you just want to run the code, just follow the steps below. For more details, jump to `Setup and sample run` section.
+
+```{sh}
+> python -m venv .venv
+> source .venv/bin/activate
+> pip install -r requirements.txt
+> pip install -e .
+> make data/frll_neutral_front
+> python mark-warp-points.py --landmark_detector dlib --output experiments/001_002.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
+> python warp-train.py --no-ui experiments/001_002.yaml
+```
+
 ### Prerequisites
 1. [Anaconda](https://www.anaconda.com/products/individual#Downloads), alternativelly you can use [PyEnv](https://github.com/pyenv/pyenv) and [PyEnv-VirtualEnv](https://github.com/pyenv/pyenv-virtualenv) or other environment management mechanism
 2. [Git](https://git-scm.com/download)
@@ -41,11 +53,11 @@ On the repository root, we stored most of the experiment scripts needed to repro
 * `morph-train.py` - trains a network for morphing(blending) two initial states and a (neural) warping (_very volatile_)
 * `warp-inference-image.py` - runs the inference of a pretrained face warping network, outputs an image, or series of images
 * `warp-inference-vid.py` - runs the inference of a pretrained face warping network, outputs a video
-* `warp-train-continuous.py` - trains a network for face landmark warping between two continuous initial states (a.k.a. two neural networs)
-* `warp-train-discrete.py` - same as above, but with discrete images (PNG, JPG, etc.)
+* `warp-train.py` - trains a warping network for face landmark warping between two continuous or discrete initial states
 
 Inside the `standalone` folder, we've stored scripts that are related, but not necessarily essential to run the experiments. These are:
 * `create-experiment-files.py` - given a list of pairs, image paths and landmarks, creates the corresponding experiment files
+* `calc-fid.sh` -
 
 ### Setup and sample run
 For this setup, we assume that the Python version is >= 3.10.0 and CUDA Toolkit is 11.6. We also tested with Python 3.9.0 and CUDA 11.7 everything worked as well. Note that **we assume that all commands are typed in the root of the repository**, unless stated otherwise. **Note that we tested these steps only on Ubuntu 22.04.**
@@ -95,14 +107,16 @@ An optional pre-processing step is implemented in a modified version of the `ali
 
 #### How to run
 0. (Optional) Crop/resize the images
-1. Create the initial neural implicit representation of your target images (note that wildcards are accepted.)
-2. Run the warp training script
+1. (Optional) Create the initial neural implicit representation of your target images (note that wildcards are accepted.)
+2. Create the face landmarks manually ou automatically
+3. Run the warp training script
 
 In an Ubuntu 22.04 system, the commands below should do it. Note that the optional parameters have default values, thus you don't need to specify them. We do it here for some of them to demonstrate possible values:
 
 ```{sh}
 (OPTIONAL) python align.py --just-crop --output-size 1024 --n-tasks 4 data/frll/ data/frll_neutral_front_cropped
-python create-initial-states.py --nsteps 1000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
+(OPTIONAL) python create-initial-states.py --nsteps 1000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
+python mark-warp-points.py data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
 python warp-train.py experiments/001_002-baseline.yaml
 ```
 
