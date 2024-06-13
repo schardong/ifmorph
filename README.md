@@ -15,7 +15,7 @@
 <br>
 [4] Portuguese Mint and Official Printing Office (INCM),
 
-This is the official implementation of "Neural Implicit Morphing of Face Images", published on the [Proceedings of CVPR 2024](https://openaccess.thecvf.com/content/CVPR2024/html/Schardong_Neural_Implicit_Morphing_of_Face_Images_CVPR_2024_paper.html), published on [arXiv](https://arxiv.org/abs/2308.13888).
+This is the official implementation of "Neural Implicit Morphing of Face Images", published on the [Proceedings of CVPR 2024](https://openaccess.thecvf.com/content/CVPR2024/html/Schardong_Neural_Implicit_Morphing_of_Face_Images_CVPR_2024_paper.html), also on [arXiv](https://arxiv.org/abs/2308.13888).
 
 ![Overview of our method](docs/assets/nifm_overview.png)
 
@@ -159,12 +159,12 @@ Any contribution is welcome. If you spot an error or have questions, open issues
 If you find our work useful in your research, consider citing it in your tech report or paper.
 
 ```{bibtex}
-@misc{schardong2024neural,
-      title={Neural Implicit Morphing of Face Images},
-      author={Guilherme Schardong and Tiago Novello and Hallison Paz and Iurii Medvedev and Vinícius da Silva and Luiz Velho and Nuno Gonçalves},
-      year={2024},
-      eprint={2308.13888},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
+@InProceedings{Schardong_2024_CVPR,
+    author    = {Schardong, Guilherme and Novello, Tiago and Paz, Hallison and Medvedev, Iurii and da Silva, Vin{\'\i}cius and Velho, Luiz and Gon\c{c}alves, Nuno},
+    title     = {Neural Implicit Morphing of Face Images},
+    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+    month     = {June},
+    year      = {2024},
+    pages     = {7321-7330}
 }
 ```
