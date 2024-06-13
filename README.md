@@ -19,20 +19,20 @@ This is the official implementation of "Neural Implicit Morphing of Face Images"
 
 ## Getting started
 
-**TL-DR**: If you just want to run the code, just follow the steps below. For more details, jump to `Setup and sample run` section.
+**TL-DR**: If you just want to run the code, just follow the steps below (assuming a UNIX system with Make installed). For more details, jump to `Setup and sample run` section.
 
 ```{sh}
-> python -m venv .venv
-> source .venv/bin/activate
-> pip install -r requirements.txt
-> pip install -e .
-> make data/frll_neutral_front
-> python mark-warp-points.py --landmark_detector dlib --output experiments/001_002.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
-> python warp-train.py --no-ui experiments/001_002.yaml
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+make data/frll_neutral_front
+python mark-warp-points.py --landmark_detector dlib --output experiments/001_002.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
+python warp-train.py --no-ui experiments/001_002.yaml
 ```
 
 ### Prerequisites
-1. [Anaconda](https://www.anaconda.com/products/individual#Downloads), alternativelly you can use [PyEnv](https://github.com/pyenv/pyenv) and [PyEnv-VirtualEnv](https://github.com/pyenv/pyenv-virtualenv) or other environment management mechanism
+1. [Python venv](https://docs.python.org/3/library/venv.html), or [Anaconda](https://www.anaconda.com/products/individual#Downloads), alternativelly you can use [PyEnv](https://github.com/pyenv/pyenv) and [PyEnv-VirtualEnv](https://github.com/pyenv/pyenv-virtualenv) or other environment management mechanism
 2. [Git](https://git-scm.com/download)
 3. [Integrate Git Bash with conda](https://discuss.codecademy.com/t/setting-up-conda-in-git-bash/534473) (If on Windows)
 
@@ -43,21 +43,21 @@ Most of the functions are available through the `ifmorph` module. It contains th
 * `loss_functions.py` - contains loss functions for different experimental settings
 * `model.py` - network and layer definitions
 * `point_editor.py` - user interface for editing landmarks
-* `util.py` - miscelaneous functions
+* `util.py` - miscellaneous functions
 
-On the repository root, we stored most of the experiment scripts needed to reproduce our work. We list them below for completeness:
-* `align.py` - crop/resize/alignment script for the face images
-* `create-initial-states.py` - trains the networks that encode the initial states (faces) before the warping proper
-* `detect-landmarks.py` - given a list of images, detects the facial landmarks using DLib and stores them as `.DAT` files
+On the repository root, we stored most of the scripts needed to reproduce our work for general face images. We list them below for completeness:
 * `mark-warp-points.py` - marks the landmark points for warping. Optionally, allows their editing via a simple UI
-* `morph-train.py` - trains a network for morphing(blending) two initial states and a (neural) warping (_very volatile_)
 * `warp-inference-image.py` - runs the inference of a pretrained face warping network, outputs an image, or series of images
 * `warp-inference-vid.py` - runs the inference of a pretrained face warping network, outputs a video
 * `warp-train.py` - trains a warping network for face landmark warping between two continuous or discrete initial states
 
-Inside the `standalone` folder, we've stored scripts that are related, but not necessarily essential to run the experiments. These are:
-* `create-experiment-files.py` - given a list of pairs, image paths and landmarks, creates the corresponding experiment files
-* `calc-fid.sh` -
+Inside the `standalone` folder, we've stored scripts used for experiments in our paper, mainly the metrics (FID and LPIPS), alignment and, landmark detection. These are:
+* `align.py` - crop/resize/alignment script for the face images
+* `create-initial-states.py` - trains the networks that encode the initial states (faces) may be used for warping as well
+* `create-experiment-files.py` - given a list of morphing pairs, image paths and landmarks, creates the corresponding experiment files
+* `calc-fid.sh` - calculates the Fréchet Inception Distance (FID) between two sets of images
+* `calc-lpips.py` - calculates the LPIPS between pairs of images
+* `detect-landmarks.py` - given a list of images, detects the facial landmarks using DLib and stores them as `.DAT` files
 
 ### Setup and sample run
 For this setup, we assume that the Python version is >= 3.10.0 and CUDA Toolkit is 11.6. We also tested with Python 3.9.0 and CUDA 11.7 everything worked as well. Note that **we assume that all commands are typed in the root of the repository**, unless stated otherwise. **Note that we tested these steps only on Ubuntu 22.04.**
@@ -101,13 +101,13 @@ pip install -e .
 ```
 
 #### Dataset
-Download the [Face Research Lab London](https://figshare.com/articles/dataset/Face_Research_Lab_London_Set/5047666) dataset from their website. If you use makefiles, we provide a rule to download and extract the dataset to the correct location (see the `Makefile`, rule `data/frll_neutral_front`). Any image may be used, as long as it contains a face. Afterwards, just create an implicit representation by running the `create-initial-states.py` script (an example is provided below).
+Download the [Face Research Lab London](https://figshare.com/articles/dataset/Face_Research_Lab_London_Set/5047666) dataset from their website. If you use makefiles, we provide a rule to download and extract the dataset to the correct location (see the `Makefile`, rule `data/frll_neutral_front`). Any image may be used, as long as it contains a face. Optionally, you may create an implicit representation by running the `create-initial-states.py` script (an example is provided below).
 
 An optional pre-processing step is implemented in a modified version of the `align.py` script, provided by the [DiffAE](https://github.com/phizaz/diffae) authors (which they extracted from the FFHQ pre-processing script) to crop and resize the images. We modified it to allow for a "non-alignment", thus the images are cropped and resized, but not necessarilly aligned. For the quantitative comparisons, the images need to be pre-processed by the `align.py` script, since the other models assume the face to occupy a central (and large) part of the image.
 
 #### How to run
 0. (Optional) Crop/resize the images
-1. (Optional) Create the initial neural implicit representation of your target images (note that wildcards are accepted.)
+1. (Optional) Create the initial neural implicit representation of your target images (note that wildcards are accepted)
 2. Create the face landmarks manually ou automatically
 3. Run the warp training script
 
@@ -123,18 +123,18 @@ python warp-train.py experiments/001_002-baseline.yaml
 Additionally, we provide a `Makefile` with the source code, that trains the initial states (or downloads them from [here](https://drive.google.com/file/d/1QYoprK2bycXHItSkx9H8JfMGz48B9a3N/view?usp=sharing) or [here](https://drive.google.com/file/d/1guMg5ablWDQgaSfr5sFwScPWa-gm5Vsz/view?usp=sharing) if you want the cropped images) and runs the example warping experiment.
 
 ### Reproducing the paper's experiments
-To avoid cluttering the repository, we've opted to not store the experiment configuration files here. You can generate them after following the *Setup* procedure above. For convenience, you can download the experiment files from [here](https://drive.google.com/file/d/1S1J_lsuGxPeU3DMOJMinXSjHGi91m9Ru/view?usp=sharing) and pretrained image networks from [here](https://drive.google.com/file/d/1QYoprK2bycXHItSkx9H8JfMGz48B9a3N/view?usp=sharing) (also, see the **Makefile**). However, the steps to recreate those files is described below. We always assume that the commands are typed from the repository root. Additionally, we assume that the python environment is activated. First, you must crop and resize the FRLL face images, afterwards you may create the initial states. You can do so by typing:
+To avoid cluttering the repository, we've opted to store the experiment configuration files externally. You can generate them after following the *Setup* procedure above. For convenience, you can download the experiment files from [here](https://drive.google.com/file/d/1S1J_lsuGxPeU3DMOJMinXSjHGi91m9Ru/view?usp=sharing) and pretrained image networks from [here](https://drive.google.com/file/d/1QYoprK2bycXHItSkx9H8JfMGz48B9a3N/view?usp=sharing). Also, see the **Makefile** for rules that automate this process. However, we describe the steps to recreate those files below. We always assume that the commands are typed from the repository root. Additionally, we assume that the python environment is activated. First, you must crop and resize the FRLL face images, afterwards you must create the neural initial states. You can do so by typing:
 
 ```{sh}
-python align.py --just-crop --output-size 1350 --n-tasks 4 data/frll/ data/frll_neutral_front_cropped
-python create-initial-states.py --nsteps 5000 --device cuda:0 --output_path pretrained/frll_neutral_front_cropped experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front_cropped/*.png
+python standalone/align.py --just-crop --output-size 1350 --n-tasks 4 data/frll_neutral_front/ data/frll_neutral_front_cropped
+python standalone/create-initial-states.py --nsteps 5000 --device cuda:0 --output_path pretrained/frll_neutral_front_cropped experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front_cropped/*.png
 ```
 
 Note that `data/frll_neutral_front_cropped` is not in the repository as well. You can download the original images from the FRLL repository (see our **Makefile**) and crop them using the first command above.
 This will store all images in `data/frll_neutral_front_cropped` in the `pretrained/frll_neutral_front_croppped` folder. Afterwards, run the script to detect the landmarks, followed by the script to create the experiment configuration files:
 
 ```{sh}
-python detect-landmarks.py -o pretrained/frll_neutral_front_cropped/ pretrained/frll_neutral_front_cropped/*.pth
+python standalone/detect-landmarks.py -o pretrained/frll_neutral_front_cropped/ pretrained/frll_neutral_front_cropped/*.pth
 python standalone/create-experiment-files.py data/pairs_for_morphing_full.txt pretrained/frll_neutral_front_cropped/ experiments/pairwise_dlib
 ```
 
