@@ -102,13 +102,19 @@ if __name__ == "__main__":
     model = from_pth(modelpath, w0=warping_omega0, ww=warping_omegaW,
                      device=device)
 
+    reconstruct_config = config["reconstruct"]
+    if args.framedims:
+        grid_dims = [int(d) for d in args.framedims]
+    else:
+        grid_dims = reconstruct_config.get("frame_dims", [640, 640])
+
     initialstates = [None] * len(config["initial_conditions"])
     discretep = False
     for i, p in enumerate(config["initial_conditions"].values()):
         try:
             nettype = check_network_type(p)
         except NotTorchFile:
-            initialstates[i] = ImageDataset(p)
+            initialstates[i] = ImageDataset(p, sidelen=grid_dims)
             discretep = True
         else:
             if nettype == "siren":
@@ -124,78 +130,69 @@ if __name__ == "__main__":
     imbasename += ".png"
     baseimpath = osp.join(osp.expanduser(args.outputdir), imbasename)
 
-    reconstruct_config = config["reconstruct"]
-    if discretep:
-        grid_dims = initialstates[0].size
-        print(grid_dims)
-    else:
-        if args.framedims:
-            grid_dims = [int(d) for d in args.framedims]
-        else:
-            grid_dims = reconstruct_config.get("frame_dims", [640, 640])
-
     if args.timesteps:
         timesteps = [float(t) for t in args.timesteps]
 
     blending_type = args.blending
     grid = get_grid(grid_dims).to(device).requires_grad_(False)
-    for t in timesteps:
-        if discretep:
-            coords0 = warp_points(model, grid, -t)
-            coords1 = warp_points(model, grid, 1-t)
+    with torch.no_grad():
+        for t in timesteps:
+            if discretep:
+                coords0 = warp_points(model, grid, -t)
+                coords1 = warp_points(model, grid, 1-t)
 
-            rec0 = initialstates[0].pixels(coords0)
-            rec0 = rec0.reshape([
-                grid_dims[0], grid_dims[1], initialstates[0].n_channels
-            ])
-            rec1 = initialstates[1].pixels(coords1)
-            rec1 = rec1.reshape([
-                grid_dims[0], grid_dims[1], initialstates[1].n_channels
-            ])
-        else:
-            rec0, coords0 = warp_shapenet_inference(
-                grid, -t, model, initialstates[0], grid_dims, bggray=255
-            )
-
-            rec1, coords1 = warp_shapenet_inference(
-                grid, 1-t, model, initialstates[1], grid_dims, bggray=255
-            )
-
-        frame = blend_frames(rec0, rec1, t, blending_type)
-        if args.landmarks:
-            color = None
-            lms = None
-            ts = None
-            if blending_type == "src":
-                color = (225, 0, 0)
-                lms = config["loss"]["sources"]
-                ts = t
-            elif blending_type == "tgt":
-                color = (0, 225, 0)
-                lms = config["loss"]["targets"]
-                ts = t - 1
+                rec0 = initialstates[0].pixels(coords0)
+                rec0 = rec0.reshape([
+                    grid_dims[0], grid_dims[1], initialstates[0].n_channels
+                ])
+                rec1 = initialstates[1].pixels(coords1)
+                rec1 = rec1.reshape([
+                    grid_dims[0], grid_dims[1], initialstates[1].n_channels
+                ])
             else:
-                color = [(225, 0, 0), (0, 225, 0)]
-                lms = [
-                    config["loss"]["sources"],
-                    config["loss"]["targets"]
-                ]
-                ts = [t, t - 1]
+                rec0, coords0 = warp_shapenet_inference(
+                    grid, -t, model, initialstates[0], grid_dims, bggray=255
+                )
 
-            if isinstance(lms, list):
-                for c, lm, t2 in zip(color, lms, ts):
+                rec1, coords1 = warp_shapenet_inference(
+                    grid, 1-t, model, initialstates[1], grid_dims, bggray=255
+                )
+
+            frame = blend_frames(rec0, rec1, t, blending_type)
+            if args.landmarks:
+                color = None
+                lms = None
+                ts = None
+                if blending_type == "src":
+                    color = (225, 0, 0)
+                    lms = config["loss"]["sources"]
+                    ts = t
+                elif blending_type == "tgt":
+                    color = (0, 225, 0)
+                    lms = config["loss"]["targets"]
+                    ts = t - 1
+                else:
+                    color = [(225, 0, 0), (0, 225, 0)]
+                    lms = [
+                        config["loss"]["sources"],
+                        config["loss"]["targets"]
+                    ]
+                    ts = [t, t - 1]
+
+                if isinstance(lms, list):
+                    for c, lm, t2 in zip(color, lms, ts):
+                        lm = warp_points(
+                            model, torch.Tensor(lm).to(device=device).float(), t2
+                        ).detach().cpu().numpy()
+                        frame = plot_landmarks(frame, lm, c=c, r=3)
+                else:
                     lm = warp_points(
-                        model, torch.Tensor(lm).to(device=device).float(), t2
+                        model, torch.Tensor(lms).to(device=device).float(), ts
                     ).detach().cpu().numpy()
-                    frame = plot_landmarks(frame, lm, c=c, r=3)
-            else:
-                lm = warp_points(
-                    model, torch.Tensor(lms).to(device=device).float(), ts
-                ).detach().cpu().numpy()
-                frame = plot_landmarks(frame, lm=lm, c=color, r=3)
+                    frame = plot_landmarks(frame, lm=lm, c=color, r=3)
 
-        impath = baseimpath.format(t)
-        cv2.imwrite(
-            impath, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        )
-        print(f"Output image at {t} written to \"{impath}\"")
+            impath = baseimpath.format(t)
+            cv2.imwrite(
+                impath, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            )
+            print(f"Output image at {t} written to \"{impath}\"")

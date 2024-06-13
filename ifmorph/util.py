@@ -298,7 +298,7 @@ def warp_points(
     return model(t_points)["model_out"]
 
 
-def plot_landmarks(im: np.array, lm: np.array, c=(0, 255, 0), r=3) -> np.array:
+def plot_landmarks(im: np.array, landmarks: np.array, c=(0, 255, 0), r=1) -> np.array:
     """Overlays landmarks `lm` on the image `im` with colors `c` and radius
     `r`.
 
@@ -323,18 +323,20 @@ def plot_landmarks(im: np.array, lm: np.array, c=(0, 255, 0), r=3) -> np.array:
         The input image in numpy format with landmarks overlaid.
     """
     imc = im.copy()
-    lmn = lm.copy()
+    lmn = landmarks.copy()
 
-    if lm.max() <= 1.0:  # assumed to be in [?, 1] range
-        if lm.min() < 0:  # assumed to be in range [-1, 1]
+    if landmarks.max() <= 1.0:  # assumed to be in [?, 1] range
+        if landmarks.min() < 0:  # assumed to be in range [-1, 1]
             lmn = (lmn + 1.0) / 2.0
         lmn[:, 0] *= imc.shape[0]
         lmn[:, 1] *= imc.shape[1]
         lmn = lmn.astype(np.uint32)
 
-    rad = int(math.ceil(r / 2))
-    for l in lmn:
-        imc[(l[0]-rad):(l[0]+rad), (l[1]-rad):(l[1]+rad), :] = c
+    # rad = int(math.ceil(r / 2))
+    for lm in lmn:
+        imc = cv2.circle(
+            imc, lm[::-1], radius=r, color=c, thickness=-1
+        )
 
     return imc
 
@@ -562,7 +564,7 @@ def grid_image(coords):
 
 
 def image_inference(model, grid_dims, device=torch.device("cpu")):
-    """Runs inference on the model. We assume that the model represents an
+    """Runs inference on the model. We assume that `model` represents an
     image.
 
     Parameters
@@ -740,7 +742,6 @@ def get_landmark_correspondences(frame0, frame1, frame_dims,
     if method is not None and len(method):
         if method == "dlib":
             landmark_src = get_landmarks_dlib(frame0).astype(float)
-            print(landmark_src, frame_dims)
             landmark_src[:, 0] /= frame_dims[0]
             landmark_src[:, 1] /= frame_dims[1]
 
