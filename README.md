@@ -15,7 +15,7 @@
 <br>
 [4] Portuguese Mint and Official Printing Office (INCM),
 
-This is the official implementation of "Neural Implicit Morphing of Face Images", published on the [Proceedings of CVPR 2024](https://openaccess.thecvf.com/content/CVPR2024/html/Schardong_Neural_Implicit_Morphing_of_Face_Images_CVPR_2024_paper.html), also on [arXiv](https://arxiv.org/abs/2308.13888).
+This is the official implementation of "Neural Implicit Morphing of Face Images", published on the [Proceedings of CVPR 2024](https://openaccess.thecvf.com/content/CVPR2024/html/Schardong_Neural_Implicit_Morphing_of_Face_Images_CVPR_2024_paper.html), also on [arXiv](https://arxiv.org/abs/2308.13888). More results and examples in the [project page](https://schardong.github.io/ifmorph).
 
 ![Overview of our method](docs/assets/nifm_overview.png)
 
