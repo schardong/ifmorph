@@ -1,8 +1,8 @@
-.PHONY: all clean train_initial_states train_warp
+.PHONY: all clean train_initial_states train_warp install-deps nuke package
 
 all: train_initial_states train_warp
 
-install:
+install-deps:
 	@pip install -r requirements.txt
 	@pip install -e .
 
