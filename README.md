@@ -62,7 +62,7 @@ Inside the `standalone` folder, we've stored scripts used for experiments in our
 * `detect-landmarks.py` - given a list of images, detects the facial landmarks using DLib and stores them as `.DAT` files
 
 ### Setup and sample run
-For this setup, we assume that the Python version is >= 3.10.0 and CUDA Toolkit is 11.6. We also tested with Python 3.9.0 and CUDA 11.7 everything worked as well. Note that **we assume that all commands are typed in the root of the repository**, unless stated otherwise. **Note that we tested these steps only on Ubuntu 22.04.**
+For this setup, we assume that the Python version is >= 3.10.0 and CUDA Toolkit is 11.6. We also tested with Python 3.9.0 and CUDA 11.7 everything worked as well. Note that **we assume that all commands are typed in the root of the repository**, unless stated otherwise. **Note that we tested these steps only on Ubuntu 22.04.** For different Python/CUDA version, you may need to tweak the package versions, especially MediaPipe and nvidia related ones.
 
 (Optional) After cloning the repository, issue a `git submodule init` followed by `git submodule update` command on a terminal, to download the `mrimg` submodule.
 
