@@ -17,7 +17,7 @@ clean:
 nuke: clean
 	@rm -Rf pretrained
 	@rm -Rf results
-	@rm -Rf data
+	@rm -Rf data/frll*
 
 train_initial_states: data/frll_neutral_front
 	@python create-initial-states.py --nsteps 5000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
