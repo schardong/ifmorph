@@ -203,7 +203,7 @@ def get_mask(img, points, erosions=3):
     mask = cv2.fillPoly(
         mask, np.array([landmarks], dtype=np.int32), (255, 255, 255)
     )
-    cv2.imwrite("mask.png", mask)
+    # cv2.imwrite("mask.png", mask)
     if erosions:
         kernel = np.ones((5, 5), np.uint8)
         mask_eroded = cv2.erode(mask, kernel, iterations=erosions)
@@ -220,23 +220,24 @@ def cv_blending(src, tgt, t, mask, blending_type=cv2.NORMAL_CLONE):
     # else:
     #     rec1 = (1 - t) * src + t * tgt
 
-    rec0np = (src.detach().cpu() * 255).clamp(0, 255).numpy().astype(np.uint8)
-    rec1np = (rec1.detach().cpu() * 255).clamp(0, 255).numpy().astype(np.uint8)
+    rec0np = (src.detach().cpu().clamp(0, 1) * 255).numpy().astype(np.uint8)
+    rec1np = (rec1.detach().cpu().clamp(0, 1) * 255).numpy().astype(np.uint8)
+    masknp = (mask.detach().cpu().clamp(0, 1) * 255).numpy().astype(np.uint8)
 
-    br = cv2.boundingRect(mask[:, :, 0])
+    br = cv2.boundingRect(masknp)
     center = (int(br[0] + br[2] / 2), int(br[1] + br[3] / 2))
 
     rec = cv2.seamlessClone(
-        rec1np, rec0np, mask, p=center, flags=blending_type
+        rec1np, rec0np, masknp, p=center, flags=blending_type
     )
     return rec
 
 
 class BlendingType(Enum):
-    TARGET_TO_SOURCE = 0
-    SOURCE_TO_TARGET = 1
-    AVG_CLONE = 2
-    MIX_CLONE = 3
+    TARGET_TO_SOURCE = "target2source"
+    SOURCE_TO_TARGET = "source2target"
+    AVG_CLONE = "avgclone"
+    MIX_CLONE = "mixclone"
 
 
 if __name__ == '__main__':
@@ -256,7 +257,7 @@ if __name__ == '__main__':
     #     help="Number of parallel trainings to run. By default is set to 1,"
     #     " meaning that we run serially."
     # )
-    p# arser.add_argument(
+    # parser.add_argument(
     #     "--skip-finished", action="store_true",
     #     help="Skips running an experiment if the output path contains the"
     #     " \"weights.pth\" file."
@@ -267,6 +268,10 @@ if __name__ == '__main__':
     #     " we use the experiment filename and create a matching directory"
     #     " under folder \"results\"."
     # )
+    parser.add_argument(
+        "--blending", default="neural", type=str, help="Which blending to"
+        " perform: \"opencv\" or \"neural\"?"
+    )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -284,9 +289,10 @@ if __name__ == '__main__':
     os.makedirs(output_path, exist_ok=True)
 
     device = torch.device(config["device"])
-    batch_size = config["training"]["batch_size"]
+    trainingcfg = config["training"]
+    batch_size = trainingcfg["batch_size"]
 
-    blending = "neural"  # "opencv" or "neural"
+    blending = args.blending
     blending_type = BlendingType.SOURCE_TO_TARGET
     use_as_bg = "image1"
     using_dlib_face_mask = True
@@ -295,11 +301,11 @@ if __name__ == '__main__':
     model1 = from_pth(config["initial_conditions"][0], w0=1, device=device)
     model2 = from_pth(config["initial_conditions"][1], w0=1, device=device)
     warp_model = from_pth(config["warp_model"], w0=1, device=device)
-    res = 512
+    res = 768
 
     # times
-    # T = [0.0,0.16,0.32,0.5,0.66,0.82, 1.0]
-    T = [0.5]
+    T = config["loss"]["intermediate_times"]
+    # T = [0.5]
 
     grid = get_grid((res, res)).to(device)
 
@@ -367,21 +373,19 @@ if __name__ == '__main__':
 
         jac_blending = torch.cat(jac_blending, dim=0).detach().to(device)
 
-        # im1 = (gt_img1[0].view(res, res, 3).detach().cpu() * 255).clamp(0, 255).numpy().astype(np.uint8)
-        # im2 = (gt_img2[0].view(res, res, 3).detach().cpu() * 255).clamp(0, 255).numpy().astype(np.uint8)
-
-        # cv2.imwrite(f"imgs/rec_001_deform.png", cv2.cvtColor(im1, cv2.COLOR_RGB2BGR))
-        # cv2.imwrite(f"imgs/rec_002_deform.png", cv2.cvtColor(im2, cv2.COLOR_RGB2BGR))
-
         gt_img1 = torch.cat(gt_img1, dim=0).detach().to(device).unsqueeze(0)
         gt_img2 = torch.cat(gt_img2, dim=0).detach().to(device).unsqueeze(0)
 
         # saving the warped images
-        if not osp.exists("imgs"):
-            os.makedirs("imgs")
-
-        cv2.imwrite("imgs/warped_1.png", cv2.cvtColor(gt_img1.reshape(res, res, 3).cpu().numpy()*255, cv2.COLOR_RGB2BGR))
-        cv2.imwrite("imgs/warped_2.png", cv2.cvtColor(gt_img2.reshape(res, res, 3).cpu().numpy()*255, cv2.COLOR_RGB2BGR))
+        for j, wimg in enumerate([gt_img1, gt_img2]):
+            wimg = wimg.reshape(res, res, 3).cpu().clamp(0, 1).numpy() * 255
+            cv2.imwrite(
+                osp.join(output_path, f"warped_{j}.png"),
+                cv2.cvtColor(
+                    wimg.astype(np.uint8),
+                    cv2.COLOR_RGB2BGR
+                )
+            )
 
         # type of blending
         if blending_type == BlendingType.SOURCE_TO_TARGET:
@@ -394,7 +398,7 @@ if __name__ == '__main__':
             elif use_as_bg == "image2":
                 gt_img = gt_img2
             else:
-                gt_img = 0.5*(gt_img1+gt_img2)  # you can define a background image here!
+                gt_img = 0.5 * (gt_img1 + gt_img2)  # you can define a background image here!
 
         # saving the image warpings for the diffAE blending
         # cv2.imwrite(f"imgs/img_warp0_time_{t}.png", cv2.cvtColor( gt_img1.squeeze(0).clamp(0, 1).view(res, res, 3).detach().cpu().numpy() * 255, cv2.COLOR_RGB2BGR))
@@ -414,26 +418,30 @@ if __name__ == '__main__':
             src_points, tgt_points = ui.return_points()
             mask = get_mask(gt_img.reshape(res, res, 3), src_points, erosions=0)
 
-        mask = cv2.imread("mask.png")  # [:, :, 0].flatten()
+        # mask = cv2.imread("mask.png")  # [:, :, 0].flatten()
 
         if blending == "opencv":
-            # rec = cv_blending(gt_img2.reshape(res, res, 3), gt_img1.reshape(res, res, 3), t, mask, blending_type=cv2.MIXED_CLONE)
-            rec = cv_blending(gt_img1.reshape(res, res, 3), gt_img2.reshape(res, res, 3), t, mask, blending_type=cv2.NORMAL_CLONE)
-            cv2.imwrite("imgs/img_ocv_blend_no_warp_mixed.png", cv2.cvtColor(rec, cv2.COLOR_RGB2BGR))
+            for bt, btstr in zip([cv2.MIXED_CLONE, cv2.NORMAL_CLONE], ["mixed", "avg"]):
+                rec = cv_blending(
+                    gt_img1.reshape(res, res, 3),
+                    gt_img2.reshape(res, res, 3),
+                    t,
+                    mask.reshape(res, res),
+                    blending_type=bt
+                )
+                cv2.imwrite(
+                    osp.join(output_path, f"ocv_no_warp_{btstr}.png"),
+                    cv2.cvtColor(rec, cv2.COLOR_RGB2BGR)
+                )
         elif blending == "neural":
-            # mask_copy = mask.detach().cpu().numpy()
-            mask_copy = mask.copy()
+            mask_copy = mask.detach().cpu().numpy().astype(np.uint8) * 255
+            mask_copy = cv2.erode(mask_copy, np.ones((5, 5)), iterations=4)
 
-            kernel = np.ones((5, 5))
-            mask_copy = cv2.erode(mask_copy, kernel, iterations=4)
-
-            mask = torch.from_numpy(mask[:, :, 0].astype(bool)).view(-1).to(device)
-            mask_copy = torch.from_numpy(mask_copy[:, :, 0].astype(bool)).view(-1).to(device)
+            # mask = torch.from_numpy(mask[:, :, 0].astype(bool)).view(-1).to(device)
+            mask_copy = torch.from_numpy(mask_copy.astype(bool)).view(-1).to(device)
 
             dataset = PoissonEqn(gt_img, jac_blending, grid.detach())
-            # dataloader = DataLoader(dataset, batch_size=1, num_workers=0)
 
-            # config = [256, 256, 256]
             netcfg = config["network"]
             mmodel = SIREN(
                 n_in_features=netcfg["in_channels"],
@@ -448,8 +456,8 @@ if __name__ == '__main__':
                 constraint_weights=constraint_weights
             )
 
-            total_steps = 2001
-            steps_til_summary = 200
+            total_steps = trainingcfg["n_steps"]
+            steps_til_summary = trainingcfg["checkpoint_steps"]
 
             optim = torch.optim.Adam(
                 lr=config["optimizer"]["lr"],
@@ -486,27 +494,33 @@ if __name__ == '__main__':
                     train_loss.backward()
                     optim.step()
 
-                if not epoch % steps_til_summary:
+                if epoch and not epoch % steps_til_summary:
                     print("epoch %d, Total loss %0.6f, iteration time %0.6f" % (epoch, train_loss, time.time() - start_time))
                     mmodel = mmodel.eval()
                     with torch.no_grad():
-                        resv = 512
-                        new_grid = get_grid((resv, resv))
+                        new_grid = get_grid((res, res))
                         output_dict = mmodel(new_grid.to(device))
-                        rec_image, coords = output_dict['model_out'], output_dict['model_in']
+                        rec_image = output_dict["model_out"]
 
-                        # gmin, gmax = torch.min(rec_image), torch.max(rec_image)
-                        output = (rec_image)  # - gmin) / (gmax - gmin)# * torch.max(grayscale1)
-
-                        # output[...,0] = output[...,0]#*(max_R-min_R)+min_R
-                        # output[...,1] = output[...,1]#*(max_G-min_G)+min_G
-                        # output[...,2] = output[...,2]#*(max_B-min_B)+min_B
-
-                        img = output.clamp(0, 1).view(resv, resv, 3).detach().cpu().numpy() * 255
-                        # cv2.imwrite(f"imgs/img_{'-'.join([str(s) for s in config])}_time__{t}_{epoch}.png", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-                        cv2.imwrite(f"imgs/img_clone_{'-'.join([str(s) for s in config])}_time__{t}_{epoch}.png", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+                        img = rec_image.detach().clamp(0, 1).view(res, res, 3).cpu().numpy() * 255
+                        cv2.imwrite(
+                            osp.join(output_path, f"rec-{epoch}_t-{t}.png"),
+                            cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                        )
                     mmodel = mmodel.train()
 
             with torch.no_grad():
                 mmodel.update_omegas(w0=1, ww=None)
-                torch.save(mmodel.state_dict(), osp.join(output_path, "blending.pth"))
+                torch.save(
+                    mmodel.state_dict(),
+                    osp.join(output_path, f"blending_weights_t-{t}.pth")
+                )
+                new_grid = get_grid((res, res))
+                output_dict = mmodel(new_grid.to(device))
+                rec_image = output_dict["model_out"]
+
+                img = rec_image.detach().clamp(0, 1).view(res, res, 3).cpu().numpy() * 255
+                cv2.imwrite(
+                    osp.join(output_path, f"final_t-{t}.png"),
+                    cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                )

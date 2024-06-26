@@ -7,14 +7,10 @@ initial_conditions:
 warp_model: results/neutral_front-001_002-baseline/best.pth
 loss:
   intermediate_times:
-  - 0.16
-  - 0.32
   - 0.5
-  - 0.66
-  - 0.82
   constraint_weights:
     grad_constraint: 1
-    pixel_constraint: 6e4
+    pixel_constraint: 8e4
 network:
   hidden_layers:
   - 256
@@ -28,8 +24,8 @@ optimizer:
   lr: 0.0001
 training:
   batch_size: 65536
-  checkpoint_steps: 1000
+  checkpoint_steps: 200
   n_samples: 20000
-  n_steps: 20001
-  reconstruction_steps: 1000
-  warmup_steps: 1000
+  n_steps: 2001
+  reconstruction_steps: 200
+  warmup_steps: 100
