@@ -400,10 +400,6 @@ if __name__ == '__main__':
             else:
                 gt_img = 0.5 * (gt_img1 + gt_img2)  # you can define a background image here!
 
-        # saving the image warpings for the diffAE blending
-        # cv2.imwrite(f"imgs/img_warp0_time_{t}.png", cv2.cvtColor( gt_img1.squeeze(0).clamp(0, 1).view(res, res, 3).detach().cpu().numpy() * 255, cv2.COLOR_RGB2BGR))
-        # cv2.imwrite(f"imgs/img_warp1_time_{t}.png", cv2.cvtColor( gt_img2.squeeze(0).clamp(0, 1).view(res, res, 3).detach().cpu().numpy() * 255, cv2.COLOR_RGB2BGR))
-
         if using_dlib_face_mask:
             mask = get_facemask(gt_img.reshape(res, res, 3)).to(device)
             # mask = get_halfspace_mask(res).to(device)
@@ -417,8 +413,6 @@ if __name__ == '__main__':
             plt.show()
             src_points, tgt_points = ui.return_points()
             mask = get_mask(gt_img.reshape(res, res, 3), src_points, erosions=0)
-
-        # mask = cv2.imread("mask.png")  # [:, :, 0].flatten()
 
         if blending == "opencv":
             for bt, btstr in zip([cv2.MIXED_CLONE, cv2.NORMAL_CLONE], ["mixed", "avg"]):
@@ -437,7 +431,6 @@ if __name__ == '__main__':
             mask_copy = mask.detach().cpu().numpy().astype(np.uint8) * 255
             mask_copy = cv2.erode(mask_copy, np.ones((5, 5)), iterations=4)
 
-            # mask = torch.from_numpy(mask[:, :, 0].astype(bool)).view(-1).to(device)
             mask_copy = torch.from_numpy(mask_copy.astype(bool)).view(-1).to(device)
 
             dataset = PoissonEqn(gt_img, jac_blending, grid.detach())
@@ -464,7 +457,7 @@ if __name__ == '__main__':
                 params=mmodel.parameters()
             )
 
-            model_input, gt = dataset.__getitem__(None)
+            model_input, gt = dataset[0]
             gt = {key: value.to(device) for key, value in gt.items()}
 
             N = math.ceil(grid.shape[0] / batch_size)
@@ -498,8 +491,8 @@ if __name__ == '__main__':
                     print("epoch %d, Total loss %0.6f, iteration time %0.6f" % (epoch, train_loss, time.time() - start_time))
                     mmodel = mmodel.eval()
                     with torch.no_grad():
-                        new_grid = get_grid((res, res))
-                        output_dict = mmodel(new_grid.to(device))
+                        grid = grid.detach()
+                        output_dict = mmodel(grid)
                         rec_image = output_dict["model_out"]
 
                         img = rec_image.detach().clamp(0, 1).view(res, res, 3).cpu().numpy() * 255
@@ -509,15 +502,14 @@ if __name__ == '__main__':
                         )
                     mmodel = mmodel.train()
 
+            mmodel = mmodel.eval()
             with torch.no_grad():
                 mmodel.update_omegas(w0=1, ww=None)
                 torch.save(
                     mmodel.state_dict(),
                     osp.join(output_path, f"blending_weights_t-{t}.pth")
                 )
-                new_grid = get_grid((res, res))
-                output_dict = mmodel(new_grid.to(device))
-                rec_image = output_dict["model_out"]
+                rec_image = mmodel(grid.detach())["model_out"]
 
                 img = rec_image.detach().clamp(0, 1).view(res, res, 3).cpu().numpy() * 255
                 cv2.imwrite(
