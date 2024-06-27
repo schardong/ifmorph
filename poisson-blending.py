@@ -110,40 +110,11 @@ def slerp_Jacobian(val, U, V):
     omega0 = torch.acos(prod0.clamp(-0.9999, 0.9999))
     omega1 = torch.acos(prod1.clamp(-0.9999, 0.9999))
     omega2 = torch.acos(prod2.clamp(-0.9999, 0.9999))
-    # omega0 = torch.where(abs(prod0)>0.9999, torch.zeros_like(prod0)+1e-5, torch.acos(prod0.clamp(-0.9999, 0.9999)))
-    # omega1 = torch.where(abs(prod1)>0.9999, torch.zeros_like(prod1)+1e-5, torch.acos(prod1.clamp(-0.9999, 0.9999)))
-    # omega2 = torch.where(abs(prod2)>0.9999, torch.zeros_like(prod2)+1e-5, torch.acos(prod2.clamp(-0.9999, 0.9999)))
 
     res = torch.zeros_like(U_copy)
     res[..., 0, :] = (torch.sin((1.0-val)*omega0)*U_copy[..., 0, :] + torch.sin(val*omega0) * V_copy[..., 0, :]) / torch.sin(omega0)
     res[..., 1, :] = (torch.sin((1.0-val)*omega1)*U_copy[..., 1, :] + torch.sin(val*omega1) * V_copy[..., 1, :]) / torch.sin(omega1)
     res[..., 2, :] = (torch.sin((1.0-val)*omega2)*U_copy[..., 2, :] + torch.sin(val*omega2) * V_copy[..., 2, :]) / torch.sin(omega2)
-
-    # U[..., 0] /= torch.norm(U[..., 0], dim=1, keepdim=True)
-    # U[..., 1] /= torch.norm(U[..., 1], dim=1, keepdim=True)
-    # U[..., 2] /= torch.norm(U[..., 2], dim=1, keepdim=True)
-
-    # V[..., 0] /= torch.norm(V[..., 0], dim=1, keepdim=True)
-    # V[..., 1] /= torch.norm(V[..., 1], dim=1, keepdim=True)
-    # V[..., 2] /= torch.norm(V[..., 2], dim=1, keepdim=True)
-
-    # prod0 = (U[...,0]*V[...,0]).sum(1).unsqueeze(-1)
-    # prod1 = (U[...,1]*V[...,1]).sum(1).unsqueeze(-1)
-    # prod2 = (U[...,2]*V[...,2]).sum(1).unsqueeze(-1)
-
-    # omega0 = torch.where(abs(prod0)>0.9, torch.zeros_like(prod0)+1e-7, torch.acos(prod0.clamp(-0.999999, 0.999999)))
-    # omega1 = torch.where(abs(prod1)>0.9, torch.zeros_like(prod1)+1e-7, torch.acos(prod1.clamp(-0.999999, 0.999999)))
-    # omega2 = torch.where(abs(prod2)>0.9, torch.zeros_like(prod2)+1e-7, torch.acos(prod2.clamp(-0.999999, 0.999999)))
-    # # omega = torch.acos((low_norm*high_norm).sum(1).clamp(-0.999999, 0.999999)).unsqueeze(-1)
-    # so0 = torch.sin(omega0)
-    # so1 = torch.sin(omega1)
-    # so2 = torch.sin(omega2)
-    # # torch.where(so!=0)
-
-    # res = U_copy.clone()
-    # res[...,0] = (torch.sin((1.0-val)*omega0)/so0)*U_copy[...,0] + (torch.sin(val*omega0)/so0) * V_copy[...,0]
-    # res[...,1] = (torch.sin((1.0-val)*omega1)/so1)*U_copy[...,1] + (torch.sin(val*omega1)/so1) * V_copy[...,1]
-    # res[...,2] = (torch.sin((1.0-val)*omega2)/so2)*U_copy[...,2] + (torch.sin(val*omega2)/so2) * V_copy[...,2]
 
     return res
 
@@ -233,11 +204,16 @@ def cv_blending(src, tgt, t, mask, blending_type=cv2.NORMAL_CLONE):
     return rec
 
 
-class BlendingType(Enum):
+class MixType(Enum):
     TARGET_TO_SOURCE = "target2source"
     SOURCE_TO_TARGET = "source2target"
     AVG_CLONE = "avgclone"
     MIX_CLONE = "mixclone"
+
+
+class BlendingType(Enum):
+    NEURAL = "neural"
+    OPENCV = "opencv"
 
 
 if __name__ == '__main__':
@@ -269,6 +245,11 @@ if __name__ == '__main__':
     #     " under folder \"results\"."
     # )
     parser.add_argument(
+        "--landmark-model", default="", help="The landmark model to use when"
+        " building the mask that defines the blending region. May be empty"
+        " (default), \"dlib\", \"mediapipe\", \"spiga\"."
+    )
+    parser.add_argument(
         "--blending", default="neural", type=str, help="Which blending to"
         " perform: \"opencv\" or \"neural\"?"
     )
@@ -292,8 +273,8 @@ if __name__ == '__main__':
     trainingcfg = config["training"]
     batch_size = trainingcfg["batch_size"]
 
-    blending = args.blending
-    blending_type = BlendingType.SOURCE_TO_TARGET
+    blending = BlendingType(args.blending)
+    mix_type = MixType.SOURCE_TO_TARGET
     use_as_bg = "image1"
     using_dlib_face_mask = True
 
@@ -353,13 +334,13 @@ if __name__ == '__main__':
             norm2 = torch.norm(jac2,  p='fro', dim=[1, 2], keepdim=True)
 
             # type of blending
-            if blending_type == BlendingType.MIX_CLONE:
+            if mix_type == MixType.MIX_CLONE:
                 jac = (torch.where(norm1 < norm2, jac2, jac1))  # mixed cloning
-            elif blending_type == BlendingType.SOURCE_TO_TARGET:
+            elif mix_type == MixType.SOURCE_TO_TARGET:
                 jac = jac1  # clone image1 into image2
-            elif blending_type == BlendingType.TARGET_TO_SOURCE:
+            elif mix_type == MixType.TARGET_TO_SOURCE:
                 jac = jac2  # clone image2 into image1
-            elif blending_type == BlendingType.AVG_CLONE:
+            elif mix_type == MixType.AVG_CLONE:
                 jac = (1-t)*jac1 + t*jac2  # average approach
             else:
                 raise ValueError("Unknown type of blending.")
@@ -388,9 +369,9 @@ if __name__ == '__main__':
             )
 
         # type of blending
-        if blending_type == BlendingType.SOURCE_TO_TARGET:
+        if mix_type == MixType.SOURCE_TO_TARGET:
             gt_img = gt_img2
-        elif blending_type == BlendingType.TARGET_TO_SOURCE:
+        elif mix_type == MixType.TARGET_TO_SOURCE:
             gt_img = gt_img1
         else:
             if use_as_bg == "image1":
@@ -400,21 +381,21 @@ if __name__ == '__main__':
             else:
                 gt_img = 0.5 * (gt_img1 + gt_img2)  # you can define a background image here!
 
-        if using_dlib_face_mask:
+        if args.landmark_model == "dlib":
             mask = get_facemask(gt_img.reshape(res, res, 3)).to(device)
             # mask = get_halfspace_mask(res).to(device)
         else:
             # creting a mask by hand
             gt_blend = 0.5*(gt_img1+gt_img2)
             ui = FaceInteractor(
-                gt_blend.reshape(res, res, 3).cpu().numpy(), gt_img2.reshape(res, res, 3).cpu().numpy(),
-                run_mediapipe=False
+                gt_blend.reshape(res, res, 3).cpu().numpy(),
+                gt_img2.reshape(res, res, 3).cpu().numpy()
             )
             plt.show()
-            src_points, tgt_points = ui.return_points()
+            src_points, tgt_points = ui.landmarks
             mask = get_mask(gt_img.reshape(res, res, 3), src_points, erosions=0)
 
-        if blending == "opencv":
+        if blending == BlendingType.OPENCV:
             for bt, btstr in zip([cv2.MIXED_CLONE, cv2.NORMAL_CLONE], ["mixed", "avg"]):
                 rec = cv_blending(
                     gt_img1.reshape(res, res, 3),
@@ -427,10 +408,9 @@ if __name__ == '__main__':
                     osp.join(output_path, f"ocv_no_warp_{btstr}.png"),
                     cv2.cvtColor(rec, cv2.COLOR_RGB2BGR)
                 )
-        elif blending == "neural":
+        elif blending == BlendingType.NEURAL:
             mask_copy = mask.detach().cpu().numpy().astype(np.uint8) * 255
             mask_copy = cv2.erode(mask_copy, np.ones((5, 5)), iterations=4)
-
             mask_copy = torch.from_numpy(mask_copy.astype(bool)).view(-1).to(device)
 
             dataset = PoissonEqn(gt_img, jac_blending, grid.detach())
