@@ -140,8 +140,8 @@ if __name__ == "__main__":
     with torch.no_grad():
         for t in timesteps:
             if discretep:
-                coords0 = warp_points(model, grid, -t)
-                coords1 = warp_points(model, grid, 1-t)
+                coords0, _ = warp_points(model, grid, -t)
+                coords1, _ = warp_points(model, grid, 1-t)
 
                 rec0 = initialstates[0].pixels(coords0)
                 rec0 = rec0.reshape([
@@ -183,12 +183,12 @@ if __name__ == "__main__":
 
                 if isinstance(lms, list):
                     for c, lm, t2 in zip(color, lms, ts):
-                        lm = warp_points(
+                        lm, _ = warp_points(
                             model, torch.Tensor(lm).to(device=device).float(), t2
                         ).detach().cpu().numpy()
                         frame = plot_landmarks(frame, lm, c=c, r=3)
                 else:
-                    lm = warp_points(
+                    lm, _ = warp_points(
                         model, torch.Tensor(lms).to(device=device).float(), ts
                     ).detach().cpu().numpy()
                     frame = plot_landmarks(frame, lm=lm, c=color, r=3)

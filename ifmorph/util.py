@@ -222,7 +222,8 @@ def batched_predict(model: torch.nn.Module, coord_arr: torch.Tensor,
 
 
 def warp_shapenet_inference(
-        grid, t, warpnet, shapenet, framedims, bggray=0
+        grid, t, warpnet, shapenet, framedims=None, bggray=0,
+        preserve_grad=False, normalize_to_byte=True
 ):
     """Performs the inference on a `warpnet` and feeds the results to a
     `shapenet`, normalizing the areas out-of-domain.
@@ -244,9 +245,16 @@ def warp_shapenet_inference(
         inference on those points. It must output a an Nx{1,3} tensor,
         depending on the number of channels of the output image.
 
-    framedims: tuple with *2* ints
+    framedims: tuple with *2* ints, optional
         The number of rows and columns of the output image. Note that the
-        number of channels is inferred from `shapenet`.
+        number of channels is inferred from `shapenet`. By default is `None`,
+        meaning that no reshape will be performed.
+
+    preserve_grad: boolean, optional
+        Default is False.
+
+    normalize_to_byte: boolean, optional
+        Default is True.
 
     Returns
     -------
@@ -257,8 +265,17 @@ def warp_shapenet_inference(
     coords: torch.Tensor
         The warped coordinates used as input for `shapenet`.
     """
-    coords = warp_points(warpnet, grid, t)
-    img = shapenet(coords)["model_out"].detach().clamp(0, 1) * 255
+    wcoords, _ = warp_points(
+        warpnet, grid, t, preserve_grad=preserve_grad
+    )
+    out = shapenet(wcoords, preserve_grad=preserve_grad)
+    img = out["model_out"].clamp(0, 1)
+    coords = out["model_in"]
+    if preserve_grad is False:
+        img = img.detach()
+    if normalize_to_byte:
+        img *= 255
+
     # restrict to the image domain [-1,1]^2
     img = torch.where(
         torch.abs(coords[..., 0].unsqueeze(-1)) < 1.0,
@@ -270,12 +287,14 @@ def warp_shapenet_inference(
         img,
         torch.full_like(img, bggray)
     )
-    img = img.reshape([framedims[0], framedims[1], shapenet.out_features])
+    if framedims is not None:
+        img = img.reshape([framedims[0], framedims[1], shapenet.out_features])
     return img, coords
 
 
 def warp_points(
-        model: torch.nn.Module, points: torch.Tensor, t: float
+        model: torch.nn.Module, points: torch.Tensor, t: float,
+        preserve_grad: bool = False
 ) -> torch.Tensor:
     """Warps `points` by parameter `t` in range [-1, 1] using `model`.
 
@@ -290,12 +309,21 @@ def warp_points(
     t: number
         Parameter in [-1, 1] range to warp the points.
 
+    preserve_grad: boolean, optional
+        Default is False.
+
     Returns
     -------
     warped_points: torch.Tensor
+        Output of `model(points)`.
+
+    input_points: torch.Tensor
+        Input of `model(points)`. Needed if `preserve_grad=True`, otherwise
+        its a perfect copy of `points`.
     """
     t_points = torch.cat((points, torch.full_like(points[..., -1:], t)), dim=1)
-    return model(t_points)["model_out"]
+    out = model(t_points, preserve_grad=preserve_grad)
+    return out["model_out"], out["model_in"]
 
 
 def plot_landmarks(im: np.array, landmarks: np.array, c=(0, 255, 0), r=1) -> np.array:
@@ -512,11 +540,14 @@ def create_morphing(
                     grid, 1-t, warp_net, frame1, frame_dims
                 )
             else:
+                wpoints, _ = warp_points(warp_net, grid, -t)
                 rec0 = frame0.pixels(
-                    warp_points(warp_net, grid, -t)
+                    wpoints
                 ).reshape([frame_dims[0], frame_dims[1], frame0.n_channels])
+
+                wpoints, _ = warp_points(warp_net, grid, 1 - t)
                 rec1 = frame1.pixels(
-                    warp_points(warp_net, grid, 1 - t)
+                    wpoints
                 ).reshape([frame_dims[0], frame_dims[1], frame1.n_channels])
 
             rec = blend_frames(rec0, rec1, t, blending_type=blending_type)
@@ -529,16 +560,12 @@ def create_morphing(
 
             if overlay_landmarks:
                 for c, pts, ts in zip([(0, 0, 255), (0, 255, 0)], [landmark_src, landmark_tgt], [t, t-1]):
-                    rec = plot_landmarks(
-                        rec,
-                        warp_points(
-                            warp_net,
-                            torch.Tensor(pts).to(device).float(),
-                            ts
-                        ).detach().cpu().numpy(),
-                        c=c,
-                        r=1
-                    )
+                    y, _ = warp_points(
+                        warp_net,
+                        torch.Tensor(pts).to(device).float(),
+                        ts
+                    ).detach().cpu().numpy()
+                    rec = plot_landmarks(rec, y, c=c, r=1)
 
             out.write(rec)
     out.release()
