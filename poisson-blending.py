@@ -184,12 +184,8 @@ def get_mask(img, points, erosions=3):
     return torch.from_numpy(mask[:, :, 0].astype(bool)).view(-1)
 
 
-def cv_blending(src, tgt, t, mask, blending_type=cv2.NORMAL_CLONE):
+def cv_blending(src, tgt, mask, blending_type=cv2.NORMAL_CLONE):
     rec1 = tgt
-    # if blending_type == cv2.MIXED_CLONE:
-    #     rec1 = t * tgt
-    # else:
-    #     rec1 = (1 - t) * src + t * tgt
 
     rec0np = (src.detach().cpu().clamp(0, 1) * 255).numpy().astype(np.uint8)
     rec1np = (rec1.detach().cpu().clamp(0, 1) * 255).numpy().astype(np.uint8)
@@ -204,7 +200,7 @@ def cv_blending(src, tgt, t, mask, blending_type=cv2.NORMAL_CLONE):
     return rec
 
 
-class MixType(Enum):
+class GradientMix(Enum):
     TARGET_TO_SOURCE = "target2source"
     SOURCE_TO_TARGET = "source2target"
     AVG_CLONE = "avgclone"
@@ -253,6 +249,11 @@ if __name__ == '__main__':
         "--blending", default="neural", type=str, help="Which blending to"
         " perform: \"opencv\" or \"neural\"?"
     )
+    parser.add_argument(
+        "--image-size", default="768x768", type=str, help="Size of output "
+        " image in pixels. Note that we accept only the following format:"
+        " HEIGHTxWIDTH, e.g. 768x768 (default)."
+    )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -274,7 +275,7 @@ if __name__ == '__main__':
     batch_size = trainingcfg["batch_size"]
 
     blending = BlendingType(args.blending)
-    mix_type = MixType.SOURCE_TO_TARGET
+    mix_type = GradientMix.SOURCE_TO_TARGET
     use_as_bg = "image1"
     using_dlib_face_mask = True
 
@@ -282,34 +283,30 @@ if __name__ == '__main__':
     model1 = from_pth(config["initial_conditions"][0], w0=1, device=device)
     model2 = from_pth(config["initial_conditions"][1], w0=1, device=device)
     warp_model = from_pth(config["warp_model"], w0=1, device=device)
-    res = 768
-
+    height, width = [int(d) for d in args.image_size.split('x')]
+    
     # times
     T = config["loss"]["intermediate_times"]
-    # T = [0.5]
-
-    grid = get_grid((res, res)).to(device)
+    grid = get_grid((height, width)).to(device)
 
     for i, t in enumerate(T):
-        grid2d = get_grid((res, res)).to(device)
-        time_coord = t * torch.ones((res * res, 1)).to(device)
-        coords = torch.cat([grid2d, time_coord], dim=-1)
+        #grid2d = get_grid((height, width)).to(device)
+        time_coord = torch.full((height * width, 1), t).to(device)
+        coords = torch.cat([grid, time_coord], dim=-1)
 
         jac_blending = []
         gt_img1 = []
         gt_img2 = []
 
-        num_steps = 2*math.ceil(grid.shape[0] / batch_size)
+        num_steps = 2 * math.ceil(grid.shape[0] / batch_size)
         npoints1 = math.ceil(coords.shape[0] / num_steps)
         for step in range(num_steps):
             batched_coords = coords[step * npoints1:(step+1) * npoints1, ...].detach().clone().requires_grad_(True)
 
             # warped_image1(x,t) = I1 o T(x,-t). Paper notation.
             batched_coords1 = torch.cat((batched_coords[..., :2], -batched_coords[..., -1:]), dim=-1).to(device)
-            warped_coords = warp_model(batched_coords1, preserve_grad=True)['model_out']
-            out_dict1 = model1(warped_coords.to(device), preserve_grad=True)
-            # out_dict1 = model1(grid1[...,0:2].to(device), preserve_grad=True)
-            image1 = out_dict1['model_out']
+            warped_coords = warp_model(batched_coords1, preserve_grad=True)["model_out"]
+            image1 = model1(warped_coords.to(device), preserve_grad=True)["model_out"]
 
             # grayscale1 = 0.2126 * output1[..., 0:1] + 0.7152 * output1[..., 1:2] + 0.0722 * output1[..., 2:3]
             # grad_img1 = gradient(grayscale1, gridt)[...,0:2].detach()
@@ -318,12 +315,10 @@ if __name__ == '__main__':
 
             # warped_image2(x,t) = I2 o T(x,1-t). Paper notation.
             grid3d2 = batched_coords.detach().clone().to(device).requires_grad_(True)
+            
             grid2 = torch.cat((grid3d2[..., :2], 1-grid3d2[..., -1:]), dim=-1).to(device)
             wgrid2 = warp_model(grid2, preserve_grad=True)['model_out']
-
-            out_dict2 = model2(wgrid2.to(device), preserve_grad=True)
-            # out_dict2 = model2(grid2[...,0:2].to(device), preserve_grad=True)
-            image2 = out_dict2['model_out']
+            image2 = model2(wgrid2.to(device), preserve_grad=True)["model_out"]
 
             # grayscale2 = 0.2126 * output2[..., 0:1] + 0.7152 * output2[..., 1:2] + 0.0722 * output2[..., 2:3]
             # grad_img2 = gradient(grayscale2, gridt)[...,0:2].detach()
@@ -333,14 +328,14 @@ if __name__ == '__main__':
             norm1 = torch.norm(jac1,  p='fro', dim=[1, 2], keepdim=True)
             norm2 = torch.norm(jac2,  p='fro', dim=[1, 2], keepdim=True)
 
-            # type of blending
-            if mix_type == MixType.MIX_CLONE:
+            # how to mix the gradients?
+            if mix_type == GradientMix.MIX_CLONE:
                 jac = (torch.where(norm1 < norm2, jac2, jac1))  # mixed cloning
-            elif mix_type == MixType.SOURCE_TO_TARGET:
+            elif mix_type == GradientMix.SOURCE_TO_TARGET:
                 jac = jac1  # clone image1 into image2
-            elif mix_type == MixType.TARGET_TO_SOURCE:
+            elif mix_type == GradientMix.TARGET_TO_SOURCE:
                 jac = jac2  # clone image2 into image1
-            elif mix_type == MixType.AVG_CLONE:
+            elif mix_type == GradientMix.AVG_CLONE:
                 jac = (1-t)*jac1 + t*jac2  # average approach
             else:
                 raise ValueError("Unknown type of blending.")
@@ -359,7 +354,7 @@ if __name__ == '__main__':
 
         # saving the warped images
         for j, wimg in enumerate([gt_img1, gt_img2]):
-            wimg = wimg.reshape(res, res, 3).cpu().clamp(0, 1).numpy() * 255
+            wimg = wimg.reshape(height, width, 3).cpu().clamp(0, 1).numpy() * 255
             cv2.imwrite(
                 osp.join(output_path, f"warped_{j}.png"),
                 cv2.cvtColor(
@@ -368,10 +363,10 @@ if __name__ == '__main__':
                 )
             )
 
-        # type of blending
-        if mix_type == MixType.SOURCE_TO_TARGET:
+        # Setting the background image according to how we mixed the gradients
+        if mix_type == GradientMix.SOURCE_TO_TARGET:
             gt_img = gt_img2
-        elif mix_type == MixType.TARGET_TO_SOURCE:
+        elif mix_type == GradientMix.TARGET_TO_SOURCE:
             gt_img = gt_img1
         else:
             if use_as_bg == "image1":
@@ -382,26 +377,26 @@ if __name__ == '__main__':
                 gt_img = 0.5 * (gt_img1 + gt_img2)  # you can define a background image here!
 
         if args.landmark_model == "dlib":
-            mask = get_facemask(gt_img.reshape(res, res, 3)).to(device)
+            mask = get_facemask(gt_img.reshape(height, width, 3)).to(device)
             # mask = get_halfspace_mask(res).to(device)
         else:
             # creting a mask by hand
             gt_blend = 0.5*(gt_img1+gt_img2)
             ui = FaceInteractor(
-                gt_blend.reshape(res, res, 3).cpu().numpy(),
-                gt_img2.reshape(res, res, 3).cpu().numpy()
+                gt_blend.reshape(height, width, 3).cpu().numpy(),
+                gt_img2.reshape(height, width, 3).cpu().numpy()
             )
             plt.show()
             src_points, tgt_points = ui.landmarks
-            mask = get_mask(gt_img.reshape(res, res, 3), src_points, erosions=0)
+            mask = get_mask(gt_img.reshape(height, width, 3), src_points, erosions=0)
 
         if blending == BlendingType.OPENCV:
             for bt, btstr in zip([cv2.MIXED_CLONE, cv2.NORMAL_CLONE], ["mixed", "avg"]):
                 rec = cv_blending(
-                    gt_img1.reshape(res, res, 3),
-                    gt_img2.reshape(res, res, 3),
+                    gt_img1.reshape(height, width, 3),
+                    gt_img2.reshape(height, width, 3),
                     t,
-                    mask.reshape(res, res),
+                    mask.reshape(height, width),
                     blending_type=bt
                 )
                 cv2.imwrite(
@@ -475,7 +470,7 @@ if __name__ == '__main__':
                         output_dict = mmodel(grid)
                         rec_image = output_dict["model_out"]
 
-                        img = rec_image.detach().clamp(0, 1).view(res, res, 3).cpu().numpy() * 255
+                        img = rec_image.detach().clamp(0, 1).view(height, width, 3).cpu().numpy() * 255
                         cv2.imwrite(
                             osp.join(output_path, f"rec-{epoch}_t-{t}.png"),
                             cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -491,7 +486,7 @@ if __name__ == '__main__':
                 )
                 rec_image = mmodel(grid.detach())["model_out"]
 
-                img = rec_image.detach().clamp(0, 1).view(res, res, 3).cpu().numpy() * 255
+                img = rec_image.detach().clamp(0, 1).view(height, width, 3).cpu().numpy() * 255
                 cv2.imwrite(
                     osp.join(output_path, f"final_t-{t}.png"),
                     cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
