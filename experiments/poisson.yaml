@@ -29,3 +29,7 @@ training:
   n_steps: 2001
   reconstruction_steps: 200
   warmup_steps: 100
+reconstruct:
+    frame_dims:
+    - 800
+    - 800

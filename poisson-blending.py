@@ -17,7 +17,9 @@ from torch.utils.data import Dataset
 from ifmorph.diff_operators import jacobian
 from ifmorph.model import from_pth, SIREN
 from ifmorph.point_editor import FaceInteractor
-from ifmorph.util import get_grid, get_silhouette_lm, get_bottom_face_lm
+from ifmorph.util import (get_grid, blend_frames, get_silhouette_lm,
+                          get_bottom_face_lm, warp_shapenet_inference,
+                          warp_points)
 
 
 DEFAULT_BLENDING_WEIGHTS = {
@@ -224,6 +226,11 @@ if __name__ == '__main__':
         "--seed", default=123, type=int,
         help="Seed for the RNG. By default its 123."
     )
+    parser.add_argument(
+        "--device", "-d", default="cuda:0",
+        help="The device to run the inference on. By default its set as"
+        " \"cuda:0\" If CUDA is not supported, then the CPU will be used."
+    )
     # parser.add_argument(
     #     "--n-tasks", default=1, type=int,
     #     help="Number of parallel trainings to run. By default is set to 1,"
@@ -247,18 +254,30 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--blending", default="neural", type=str, help="Which blending to"
-        " perform: \"opencv\" or \"neural\"?"
+        " perform: \"opencv\" or \"neural\" (default)?"
     )
     parser.add_argument(
-        "--image-size", default="768x768", type=str, help="Size of output "
-        " image in pixels. Note that we accept only the following format:"
-        " HEIGHTxWIDTH, e.g. 768x768 (default)."
+        "--framedims", "-f", nargs='+', help="Height and width (in pixels) for"
+        " the output image. Note that it must contain two numbers separated by"
+        " a space, e.g. \"-f 800 600\"."
     )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     random.seed(args.seed)
+
+    devstr = args.device
+    if "cuda" in devstr and not torch.cuda.is_available():
+        devstr = "cpu"
+        print("No CUDA available devices found on system. Using CPU.")
+    else:
+        torch.cuda.empty_cache()
+    device = torch.device(devstr)
+
+    if not osp.exists(args.config_path):
+        raise FileNotFoundError("Configuration file not found at"
+                                f" \"{args.config_path}\". Aborting.")
 
     with open(args.config_path, 'r') as f:
         config = yaml.safe_load(f)
@@ -267,10 +286,8 @@ if __name__ == '__main__':
         osp.split(osp.join(config["warp_model"]))[0],
         "poisson-blending"
     )
-
     os.makedirs(output_path, exist_ok=True)
 
-    device = torch.device(config["device"])
     trainingcfg = config["training"]
     batch_size = trainingcfg["batch_size"]
 
@@ -283,50 +300,47 @@ if __name__ == '__main__':
     model1 = from_pth(config["initial_conditions"][0], w0=1, device=device)
     model2 = from_pth(config["initial_conditions"][1], w0=1, device=device)
     warp_model = from_pth(config["warp_model"], w0=1, device=device)
-    height, width = [int(d) for d in args.image_size.split('x')]
-    
+
+    reconstruct_config = config["reconstruct"]
+    if args.framedims:
+        grid_dims = [int(d) for d in args.framedims]
+    else:
+        grid_dims = reconstruct_config.get("frame_dims", [640, 640])
+
     # times
     T = config["loss"]["intermediate_times"]
-    grid = get_grid((height, width)).to(device)
+    grid = get_grid(grid_dims).to(device).requires_grad_(True)
 
     for i, t in enumerate(T):
-        #grid2d = get_grid((height, width)).to(device)
-        time_coord = torch.full((height * width, 1), t).to(device)
-        coords = torch.cat([grid, time_coord], dim=-1)
-
         jac_blending = []
         gt_img1 = []
         gt_img2 = []
 
         num_steps = 2 * math.ceil(grid.shape[0] / batch_size)
-        npoints1 = math.ceil(coords.shape[0] / num_steps)
+        npoints1 = math.ceil(grid.shape[0] / num_steps)
         for step in range(num_steps):
-            batched_coords = coords[step * npoints1:(step+1) * npoints1, ...].detach().clone().requires_grad_(True)
+            batched_grid = grid[step * npoints1:(step+1) * npoints1, ...].detach().clone()
 
             # warped_image1(x,t) = I1 o T(x,-t). Paper notation.
-            batched_coords1 = torch.cat((batched_coords[..., :2], -batched_coords[..., -1:]), dim=-1).to(device)
-            warped_coords = warp_model(batched_coords1, preserve_grad=True)["model_out"]
-            image1 = model1(warped_coords.to(device), preserve_grad=True)["model_out"]
-
-            # grayscale1 = 0.2126 * output1[..., 0:1] + 0.7152 * output1[..., 1:2] + 0.0722 * output1[..., 2:3]
-            # grad_img1 = gradient(grayscale1, gridt)[...,0:2].detach()
-
-            jac1 = jacobian(image1.unsqueeze(0), batched_coords)[0].detach().to(device).squeeze(0)
+            image1, coords = warp_shapenet_inference(
+                batched_grid, -t, warp_model, model1, preserve_grad=True,
+                normalize_to_byte=False
+            )
+            jac1 = jacobian(
+                image1.unsqueeze(0), coords
+            )[0].detach().to(device).squeeze(0)
 
             # warped_image2(x,t) = I2 o T(x,1-t). Paper notation.
-            grid3d2 = batched_coords.detach().clone().to(device).requires_grad_(True)
-            
-            grid2 = torch.cat((grid3d2[..., :2], 1-grid3d2[..., -1:]), dim=-1).to(device)
-            wgrid2 = warp_model(grid2, preserve_grad=True)['model_out']
-            image2 = model2(wgrid2.to(device), preserve_grad=True)["model_out"]
+            image2, coords = warp_shapenet_inference(
+                batched_grid, 1 - t, warp_model, model2, preserve_grad=True,
+                normalize_to_byte=False
+            )
+            jac2 = jacobian(
+                image2.unsqueeze(0), coords
+            )[0].detach().to(device).squeeze(0)
 
-            # grayscale2 = 0.2126 * output2[..., 0:1] + 0.7152 * output2[..., 1:2] + 0.0722 * output2[..., 2:3]
-            # grad_img2 = gradient(grayscale2, gridt)[...,0:2].detach()
-
-            jac2 = jacobian(image2.unsqueeze(0), grid3d2)[0].detach().to(device).squeeze(0)
-
-            norm1 = torch.norm(jac1,  p='fro', dim=[1, 2], keepdim=True)
-            norm2 = torch.norm(jac2,  p='fro', dim=[1, 2], keepdim=True)
+            norm1 = torch.norm(jac1,  p="fro", dim=[1, 2], keepdim=True)
+            norm2 = torch.norm(jac2,  p="fro", dim=[1, 2], keepdim=True)
 
             # how to mix the gradients?
             if mix_type == GradientMix.MIX_CLONE:
@@ -354,7 +368,7 @@ if __name__ == '__main__':
 
         # saving the warped images
         for j, wimg in enumerate([gt_img1, gt_img2]):
-            wimg = wimg.reshape(height, width, 3).cpu().clamp(0, 1).numpy() * 255
+            wimg = wimg.reshape(grid_dims[1], grid_dims[0], 3).cpu().clamp(0, 1).numpy() * 255
             cv2.imwrite(
                 osp.join(output_path, f"warped_{j}.png"),
                 cv2.cvtColor(
@@ -377,26 +391,28 @@ if __name__ == '__main__':
                 gt_img = 0.5 * (gt_img1 + gt_img2)  # you can define a background image here!
 
         if args.landmark_model == "dlib":
-            mask = get_facemask(gt_img.reshape(height, width, 3)).to(device)
-            # mask = get_halfspace_mask(res).to(device)
+            mask = get_facemask(gt_img.reshape(grid_dims[1], grid_dims[0], 3))
+            # mask = get_halfspace_mask(res)
         else:
             # creting a mask by hand
             gt_blend = 0.5*(gt_img1+gt_img2)
             ui = FaceInteractor(
-                gt_blend.reshape(height, width, 3).cpu().numpy(),
-                gt_img2.reshape(height, width, 3).cpu().numpy()
+                gt_blend.reshape(grid_dims[1], grid_dims[0], 3).cpu().numpy(),
+                gt_img2.reshape(grid_dims[1], grid_dims[0], 3).cpu().numpy()
             )
             plt.show()
             src_points, tgt_points = ui.landmarks
-            mask = get_mask(gt_img.reshape(height, width, 3), src_points, erosions=0)
+            mask = get_mask(gt_img.reshape(grid_dims[1], grid_dims[0], 3), src_points, erosions=0)
+
+        mask = mask.to(device)
 
         if blending == BlendingType.OPENCV:
             for bt, btstr in zip([cv2.MIXED_CLONE, cv2.NORMAL_CLONE], ["mixed", "avg"]):
                 rec = cv_blending(
-                    gt_img1.reshape(height, width, 3),
-                    gt_img2.reshape(height, width, 3),
+                    gt_img1.reshape(grid_dims[1], grid_dims[0], 3),
+                    gt_img2.reshape(grid_dims[1], grid_dims[0], 3),
                     t,
-                    mask.reshape(height, width),
+                    mask.reshape(grid_dims),
                     blending_type=bt
                 )
                 cv2.imwrite(
@@ -417,9 +433,11 @@ if __name__ == '__main__':
                 hidden_layer_config=netcfg["hidden_layers"],
                 w0=netcfg["omega_0"],
                 ww=netcfg.get("omega_w", netcfg["omega_0"])
+            ).to(device)
+            losscfg = config["loss"]
+            constraint_weights = dict(
+                (k, float(c)) for k, c in losscfg["constraint_weights"].items()
             )
-            mmodel.to(device)
-            constraint_weights = dict((k, float(c)) for k, c in config["loss"]["constraint_weights"].items())
             loss_fn = GradientBlendingLoss(
                 constraint_weights=constraint_weights
             )
@@ -432,7 +450,7 @@ if __name__ == '__main__':
                 params=mmodel.parameters()
             )
 
-            model_input, gt = dataset[0]
+            _, gt = dataset[0]
             gt = {key: value.to(device) for key, value in gt.items()}
 
             N = math.ceil(grid.shape[0] / batch_size)
@@ -441,9 +459,7 @@ if __name__ == '__main__':
                 idx = torch.randperm(grid.shape[0], device=device)
                 for step in range(N):
                     start_time = time.time()
-
                     idxslice = idx[step*batch_size:(step+1)*batch_size]
-
                     in_mask_output = mmodel(grid[idxslice, ...][mask[idxslice]].unsqueeze(0))
                     outside_mask_output = mmodel(grid[idxslice, ...][~mask_copy[idxslice]].unsqueeze(0))
 
@@ -466,11 +482,8 @@ if __name__ == '__main__':
                     print("epoch %d, Total loss %0.6f, iteration time %0.6f" % (epoch, train_loss, time.time() - start_time))
                     mmodel = mmodel.eval()
                     with torch.no_grad():
-                        grid = grid.detach()
-                        output_dict = mmodel(grid)
-                        rec_image = output_dict["model_out"]
+                        img = mmodel(grid.detach())["model_out"].detach().cpu().clamp(0, 1).reshape(grid_dims[1], grid_dims[0], 3).numpy() * 255
 
-                        img = rec_image.detach().clamp(0, 1).view(height, width, 3).cpu().numpy() * 255
                         cv2.imwrite(
                             osp.join(output_path, f"rec-{epoch}_t-{t}.png"),
                             cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -479,14 +492,14 @@ if __name__ == '__main__':
 
             mmodel = mmodel.eval()
             with torch.no_grad():
-                mmodel.update_omegas(w0=1, ww=None)
-                torch.save(
-                    mmodel.state_dict(),
-                    osp.join(output_path, f"blending_weights_t-{t}.pth")
-                )
+                # mmodel.update_omegas(w0=1, ww=None)
+                # torch.save(
+                #     mmodel.state_dict(),
+                #     osp.join(output_path, f"blending_weights_t-{t}.pth")
+                # )
                 rec_image = mmodel(grid.detach())["model_out"]
 
-                img = rec_image.detach().clamp(0, 1).view(height, width, 3).cpu().numpy() * 255
+                img = rec_image.detach().clamp(0, 1).view(grid_dims[1], grid_dims[0], 3).cpu().numpy() * 255
                 cv2.imwrite(
                     osp.join(output_path, f"final_t-{t}.png"),
                     cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
