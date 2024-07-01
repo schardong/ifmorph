@@ -261,6 +261,21 @@ if __name__ == '__main__':
         " the output image. Note that it must contain two numbers separated by"
         " a space, e.g. \"-f 800 600\"."
     )
+    parser.add_argument(
+        "--gradient-transfer", "-g", default="", help="How to mix the"
+        " gradients in the target region? By default, which is empty, we fetch"
+        " this option from the configuration file. Allowed options are:"
+        " \"source2target\", \"target2source\", \"avgclone\", and"
+        " \"mixclone\"."
+    )
+    parser.add_argument(
+        "--background", "-b", default="", help="Which image to use as"
+        " background (i.e. which image to use outside of the target region)?"
+        " By default, which is empty, we fetch this option from the"
+        " configuration file. This value must match the \"initial_conditions\""
+        " indices in the configuration file, of be a floating point number to"
+        " be used as a mixture of both initial states."
+    )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -290,11 +305,17 @@ if __name__ == '__main__':
 
     trainingcfg = config["training"]
     batch_size = trainingcfg["batch_size"]
-
     blending = BlendingType(args.blending)
-    mix_type = GradientMix.SOURCE_TO_TARGET
-    use_as_bg = "image1"
-    using_dlib_face_mask = True
+
+    gradient_transfer = args.gradient_transfer
+    if not args.gradient_transfer:
+        gradient_transfer = trainingcfg["gradient_transfer"]
+    gradient_transfer = GradientMix(gradient_transfer)
+
+    use_as_bg = args.background
+    if not args.background:
+        use_as_bg = trainingcfg["background_image"]
+    use_as_bg = float(use_as_bg)
 
     # target images and warping
     model1 = from_pth(config["initial_conditions"][0], w0=1, device=device)
@@ -306,6 +327,13 @@ if __name__ == '__main__':
         grid_dims = [int(d) for d in args.framedims]
     else:
         grid_dims = reconstruct_config.get("frame_dims", [640, 640])
+
+    config["training"]["gradient_transfer"] = gradient_transfer.value
+    config["training"]["background_image"] = use_as_bg
+    config["reconstruct"]["frame_dims"] = grid_dims
+
+    with open(osp.join(output_path, "config.yaml"), 'w') as f:
+        yaml.safe_dump(config, f)
 
     # times
     T = config["loss"]["intermediate_times"]
@@ -343,13 +371,13 @@ if __name__ == '__main__':
             norm2 = torch.norm(jac2,  p="fro", dim=[1, 2], keepdim=True)
 
             # how to mix the gradients?
-            if mix_type == GradientMix.MIX_CLONE:
+            if gradient_transfer == GradientMix.MIX_CLONE:
                 jac = (torch.where(norm1 < norm2, jac2, jac1))  # mixed cloning
-            elif mix_type == GradientMix.SOURCE_TO_TARGET:
+            elif gradient_transfer == GradientMix.SOURCE_TO_TARGET:
                 jac = jac1  # clone image1 into image2
-            elif mix_type == GradientMix.TARGET_TO_SOURCE:
+            elif gradient_transfer == GradientMix.TARGET_TO_SOURCE:
                 jac = jac2  # clone image2 into image1
-            elif mix_type == GradientMix.AVG_CLONE:
+            elif gradient_transfer == GradientMix.AVG_CLONE:
                 jac = (1-t)*jac1 + t*jac2  # average approach
             else:
                 raise ValueError("Unknown type of blending.")
@@ -378,24 +406,28 @@ if __name__ == '__main__':
             )
 
         # Setting the background image according to how we mixed the gradients
-        if mix_type == GradientMix.SOURCE_TO_TARGET:
+        if gradient_transfer == GradientMix.SOURCE_TO_TARGET:
             gt_img = gt_img2
-        elif mix_type == GradientMix.TARGET_TO_SOURCE:
+        elif gradient_transfer == GradientMix.TARGET_TO_SOURCE:
             gt_img = gt_img1
         else:
-            if use_as_bg == "image1":
+            if use_as_bg == 0:
                 gt_img = gt_img1
-            elif use_as_bg == "image2":
+            elif use_as_bg == 1:
                 gt_img = gt_img2
             else:
-                gt_img = 0.5 * (gt_img1 + gt_img2)  # you can define a background image here!
+                gt_img = use_as_bg * (gt_img1 + gt_img2)  # you can define a background image here!
 
         if args.landmark_model == "dlib":
             mask = get_facemask(gt_img.reshape(grid_dims[1], grid_dims[0], 3))
             # mask = get_halfspace_mask(res)
+        elif args.landmark_model == "mediapipe":
+            raise NotImplementedError()
+        elif args.landmark_model == "spiga":
+            raise NotImplementedError()
         else:
             # creting a mask by hand
-            gt_blend = 0.5*(gt_img1+gt_img2)
+            gt_blend = 0.5 * (gt_img1 + gt_img2)
             ui = FaceInteractor(
                 gt_blend.reshape(grid_dims[1], grid_dims[0], 3).cpu().numpy(),
                 gt_img2.reshape(grid_dims[1], grid_dims[0], 3).cpu().numpy()

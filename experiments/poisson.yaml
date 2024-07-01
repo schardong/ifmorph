@@ -1,16 +1,20 @@
-description: poisson blending of 001-002
+description: poisson blending of 001-002 neutral, front, non-cropped images
 device: cuda:0
 experiment_name: neutral-front_001-002
+
 initial_conditions:
   0: pretrained/frll_neutral_front/001_03.pth
   1: pretrained/frll_neutral_front/002_03.pth
+
 warp_model: results/neutral_front-001_002-baseline/best.pth
+
 loss:
   intermediate_times:
   - 0.5
   constraint_weights:
     grad_constraint: 1
     pixel_constraint: 8e4
+
 network:
   hidden_layers:
   - 256
@@ -20,8 +24,10 @@ network:
   omega_0: 40
   omega_w: 30
   out_channels: 3
+
 optimizer:
   lr: 0.0001
+
 training:
   batch_size: 65536
   checkpoint_steps: 200
@@ -29,6 +35,9 @@ training:
   n_steps: 2001
   reconstruction_steps: 200
   warmup_steps: 100
+  gradient_transfer: source2target
+  background_image: 0
+
 reconstruct:
     frame_dims:
     - 800
