@@ -17,9 +17,8 @@ from torch.utils.data import Dataset
 from ifmorph.diff_operators import jacobian
 from ifmorph.model import from_pth, SIREN
 from ifmorph.point_editor import FaceInteractor
-from ifmorph.util import (get_grid, blend_frames, get_silhouette_lm,
-                          get_bottom_face_lm, warp_shapenet_inference,
-                          warp_points)
+from ifmorph.util import (get_grid, get_silhouette_lm,
+                          get_bottom_face_lm, warp_shapenet_inference)
 
 
 DEFAULT_BLENDING_WEIGHTS = {
@@ -157,17 +156,15 @@ def get_botton_facemask(img: torch.Tensor):
     mask = cv2.fillPoly(
         mask, np.array([landmarks], dtype=np.int32), (255, 255, 255)
     )
-    cv2.imwrite("mask.png", mask)
     kernel = np.ones((5, 5), np.uint8)
     mask_eroded = cv2.erode(mask, kernel, iterations=3)
     maskt = torch.from_numpy(mask_eroded[:, :, 0].astype(bool)).view(-1)
     return maskt
-    # cv2.imwrite("test.png", mask)
-    # br = cv2.boundingRect(mask[:, :, 0])
-    # center = (int(br[0] + br[2] / 2), int(br[1] + br[3] / 2))
 
 
-def get_mask(img, points, erosions=3):
+def get_mask(
+        img: torch.Tensor, points: np.ndarray, erosions: int = 3
+) -> torch.Tensor:
     imgnp = (img.detach().cpu().numpy() * 255).astype(np.uint8)
     landmarks = ((points / 2. + 0.5) * img.shape[0]).astype(np.int32)
     landmarks = np.fliplr(landmarks)
@@ -176,7 +173,6 @@ def get_mask(img, points, erosions=3):
     mask = cv2.fillPoly(
         mask, np.array([landmarks], dtype=np.int32), (255, 255, 255)
     )
-    # cv2.imwrite("mask.png", mask)
     if erosions:
         kernel = np.ones((5, 5), np.uint8)
         mask_eroded = cv2.erode(mask, kernel, iterations=erosions)
@@ -186,11 +182,12 @@ def get_mask(img, points, erosions=3):
     return torch.from_numpy(mask[:, :, 0].astype(bool)).view(-1)
 
 
-def cv_blending(src, tgt, mask, blending_type=cv2.NORMAL_CLONE):
-    rec1 = tgt
-
+def cv_blending(
+        src: torch.Tensor, tgt: torch.Tensor, mask: torch.Tensor,
+        blending_type=cv2.NORMAL_CLONE
+) -> np.ndarray:
     rec0np = (src.detach().cpu().clamp(0, 1) * 255).numpy().astype(np.uint8)
-    rec1np = (rec1.detach().cpu().clamp(0, 1) * 255).numpy().astype(np.uint8)
+    rec1np = (tgt.detach().cpu().clamp(0, 1) * 255).numpy().astype(np.uint8)
     masknp = (mask.detach().cpu().clamp(0, 1) * 255).numpy().astype(np.uint8)
 
     br = cv2.boundingRect(masknp)
@@ -231,26 +228,16 @@ if __name__ == '__main__':
         help="The device to run the inference on. By default its set as"
         " \"cuda:0\" If CUDA is not supported, then the CPU will be used."
     )
-    # parser.add_argument(
-    #     "--n-tasks", default=1, type=int,
-    #     help="Number of parallel trainings to run. By default is set to 1,"
-    #     " meaning that we run serially."
-    # )
-    # parser.add_argument(
-    #     "--skip-finished", action="store_true",
-    #     help="Skips running an experiment if the output path contains the"
-    #     " \"weights.pth\" file."
-    # )
-    # parser.add_argument(
-    #     "--output-path", "-o", default="results",
-    #     help="Optional output path to store experimental results. By default"
-    #     " we use the experiment filename and create a matching directory"
-    #     " under folder \"results\"."
-    # )
+    parser.add_argument(
+        "--output-path", "-o", default="results",
+        help="Optional output path to store experimental results. By default"
+        " we use the experiment filename and create a matching directory"
+        " under folder \"results\"."
+    )
     parser.add_argument(
         "--landmark-model", default="", help="The landmark model to use when"
         " building the mask that defines the blending region. May be empty"
-        " (default), \"dlib\", \"mediapipe\", \"spiga\"."
+        " (default) or \"dlib\"."
     )
     parser.add_argument(
         "--blending", default="neural", type=str, help="Which blending to"
@@ -297,10 +284,13 @@ if __name__ == '__main__':
     with open(args.config_path, 'r') as f:
         config = yaml.safe_load(f)
 
-    output_path = osp.join(
-        osp.split(osp.join(config["warp_model"]))[0],
-        "poisson-blending"
-    )
+    output_path = args.output_path
+    if not args.output_path:
+        output_path = osp.join(
+            osp.split(osp.join(config["warp_model"]))[0],
+            "poisson-blending"
+        )
+    print(f"Saving results in \"{output_path}\".")
     os.makedirs(output_path, exist_ok=True)
 
     trainingcfg = config["training"]
