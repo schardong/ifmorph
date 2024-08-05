@@ -564,7 +564,8 @@ def create_morphing(
                         warp_net,
                         torch.Tensor(pts).to(device).float(),
                         ts
-                    ).detach().cpu().numpy()
+                    )
+                    y = y.detach().cpu().numpy()
                     rec = plot_landmarks(rec, y, c=c, r=1)
 
             out.write(rec)
