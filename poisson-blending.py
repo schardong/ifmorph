@@ -237,7 +237,9 @@ if __name__ == '__main__':
     parser.add_argument(
         "--landmark-model", default="", help="The landmark model to use when"
         " building the mask that defines the blending region. May be empty"
-        " (default) or \"dlib\"."
+        " (default) or \"dlib\". If left empty, we will assume that a manual"
+        " landmark placement, thus opening a window to allow the user to mark"
+        " the points for blending."
     )
     parser.add_argument(
         "--blending", default="neural", type=str, help="Which blending to"
@@ -411,19 +413,15 @@ if __name__ == '__main__':
         if args.landmark_model == "dlib":
             mask = get_facemask(gt_img.reshape(grid_dims[1], grid_dims[0], 3))
             # mask = get_halfspace_mask(res)
-        elif args.landmark_model == "mediapipe":
-            raise NotImplementedError()
-        elif args.landmark_model == "spiga":
-            raise NotImplementedError()
         else:
             # creting a mask by hand
             gt_blend = 0.5 * (gt_img1 + gt_img2)
             ui = FaceInteractor(
                 gt_blend.reshape(grid_dims[1], grid_dims[0], 3).cpu().numpy(),
-                gt_img2.reshape(grid_dims[1], grid_dims[0], 3).cpu().numpy()
+                np.zeros((grid_dims[1], grid_dims[0], 3))
             )
             plt.show()
-            src_points, tgt_points = ui.landmarks
+            src_points, _ = ui.landmarks
             mask = get_mask(gt_img.reshape(grid_dims[1], grid_dims[0], 3), src_points, erosions=0)
 
         mask = mask.to(device)
@@ -465,7 +463,8 @@ if __name__ == '__main__':
             )
 
             total_steps = trainingcfg["n_steps"]
-            steps_til_summary = trainingcfg["checkpoint_steps"]
+            steps_to_checkpoint = trainingcfg["checkpoint_steps"]
+            steps_to_reconstruction = trainingcfg["reconstruction_steps"]
 
             optim = torch.optim.Adam(
                 lr=config["optimizer"]["lr"],
@@ -500,29 +499,38 @@ if __name__ == '__main__':
                     train_loss.backward()
                     optim.step()
 
-                if epoch and not epoch % steps_til_summary:
-                    print("epoch %d, Total loss %0.6f, iteration time %0.6f" % (epoch, train_loss, time.time() - start_time))
+                if epoch and epoch % steps_to_checkpoint == 0:
+                    print("Epoch %d, Total loss %0.6f, iteration time %0.6f" % (epoch, train_loss, time.time() - start_time))
+                    mpath = osp.join(output_path, f"checkpoint_t-{t}_e-{epoch}.pth")
+                    torch.save(mmodel, mpath)
+
+                if epoch and epoch % steps_to_reconstruction == 0:
                     mmodel = mmodel.eval()
                     with torch.no_grad():
                         img = mmodel(grid.detach())["model_out"].detach().cpu().clamp(0, 1).reshape(grid_dims[1], grid_dims[0], 3).numpy() * 255
 
+                        imgpath = osp.join(output_path, f"rec-{epoch}_t-{t}.png")
                         cv2.imwrite(
-                            osp.join(output_path, f"rec-{epoch}_t-{t}.png"),
-                            cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                            imgpath,
+                            cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_RGB2BGR)
                         )
+                        print(f"Reconstruction saved in \"{imgpath}\".")
                     mmodel = mmodel.train()
 
             mmodel = mmodel.eval()
             with torch.no_grad():
-                # mmodel.update_omegas(w0=1, ww=None)
-                # torch.save(
-                #     mmodel.state_dict(),
-                #     osp.join(output_path, f"blending_weights_t-{t}.pth")
-                # )
-                rec_image = mmodel(grid.detach())["model_out"]
+                mpath = osp.join(output_path, f"blending_weights_t-{t}.pth")
+                torch.save(
+                    mmodel.update_omegas(w0=1, ww=None).state_dict(),
+                    mpath
+                )
+                print(f"Blending model saved in \"{mpath}\".")
 
+                rec_image = mmodel(grid.detach())["model_out"]
+                impath = osp.join(output_path, f"final_t-{t}.png")
                 img = rec_image.detach().clamp(0, 1).view(grid_dims[1], grid_dims[0], 3).cpu().numpy() * 255
                 cv2.imwrite(
-                    osp.join(output_path, f"final_t-{t}.png"),
-                    cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                    impath,
+                    cv2.cvtColor(img.astype(np.uint8), cv2.COLOR_RGB2BGR)
                 )
+                print(f"Reconstruction saved in \"{impath}\".")
