@@ -147,8 +147,17 @@ class SIREN(nn.Module):
 
         Parameters
         ----------
-        new_w0: number, optional
+        w0: number, optional
             The new omega_0 value to assume. By default is 1.
+
+        ww: number, optional
+            The new omega_w value to assume. By default is None, meaning
+            that `ww` wil be set to `w0`.
+
+        Returns
+        -------
+        self: SIREN
+            The updated network.
         """
         if ww is None:
             ww = w0
@@ -167,6 +176,8 @@ class SIREN(nn.Module):
         self.net[0][1].w0 = w0
         for i in range(1, len(self.net)-1):
             self.net[i][1].w0 = ww
+
+        return self
 
     def from_pretrained_initial_condition(self, other: OrderedDict):
         """Application of the neural network initialization proposed by
