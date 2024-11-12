@@ -67,7 +67,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--blending", "-b", default="linear",
         help="The type of blending to use. May be any of \"linear\", \"min\","
-        " \"max\", \"dist\", \"src\", \"tgt\", \"seamless_{normal,mix}\"."
+        " \"max\", \"dist\", \"src\", \"dst\","
+        " \"seamless_{normal,mix}_{src,dst}\"."
     )
     args = parser.parse_args()
 
@@ -126,7 +127,7 @@ if __name__ == "__main__":
             else:
                 raise ValueError(f"Unknown network type: {nettype}")
 
-    imbasename = f"frame_{args.checkpoint}" + "_{}"
+    imbasename = f"frame_{args.checkpoint}" + "_{}_{}"
     if args.landmarks:
         imbasename += "_landmarks"
     imbasename += ".png"
@@ -193,7 +194,7 @@ if __name__ == "__main__":
                     ).detach().cpu().numpy()
                     frame = plot_landmarks(frame, lm=lm, c=color, r=3)
 
-            impath = baseimpath.format(t)
+            impath = baseimpath.format(t, blending_type)
             cv2.imwrite(
                 impath, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             )
