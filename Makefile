@@ -48,19 +48,17 @@ data/frll_neutral_front:
 
 pretrained/frll_neutral_front:
 	@mkdir -p $@
-	@./download_data.sh 1QYoprK2bycXHItSkx9H8JfMGz48B9a3N frll_neutral_front.tar.bz2
-	@tar -xjf frll_neutral_front.tar.bz2
+	@python standalone/download-data.py 1QYoprK2bycXHItSkx9H8JfMGz48B9a3N frll_neutral_front.tar.bz2
+	@tar -xjf frll_neutral_front.tar.bz2 || (echo "bzip failed $$?"; rm -Rf $@ cookie frll_neutral_front.tar.bz2; exit 1)
 	@mv frll_neutral_front/*.pth $@
 	@rm -Rf frll_neutral_front.tar.bz2 frll_neutral_front/
-	@rm -f cookie
 
 data/frll_neutral_front_cropped: data/frll_neutral_front
 	@python align.py --just-crop --output-size 1350 --n-tasks 4 $< $@
 
 pretrained/frll_neutral_front_cropped:
 	@mkdir -p $@
-	@./download_data.sh 1guMg5ablWDQgaSfr5sFwScPWa-gm5Vsz frll_cropped.tar.bz2
-	@tar -xjf frll_cropped.tar.bz2
+	@python standalone/download-data.py 1guMg5ablWDQgaSfr5sFwScPWa-gm5Vsz frll_cropped.tar.bz2
+	@tar -xjf frll_cropped.tar.bz2 || (echo "bzip failed $$?"; rm -Rf $@ cookie frll_cropped.tar.bz2; exit 1)
 	@mv frll_cropped/*.pth $@
 	@rm -Rf frll_cropped.tar.bz2 frll_cropped/
-	@rm -f cookie
