@@ -67,8 +67,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--blending", "-b", default="linear",
         help="The type of blending to use. May be any of \"linear\", \"min\","
-        " \"max\", \"dist\", \"src\", \"dst\","
-        " \"seamless_{normal,mix}_{src,dst}\"."
+        " \"max\", \"dist\", \"src\", \"tgt\","
+        " \"seamless_{normal,mix}_{src,tgt}\". Note that for"
+        " \"seamless_{mix,normal}\", if \"src\" or \"tgt\" is not specified,"
+        " we assume \"src\" as default."
     )
     args = parser.parse_args()
 

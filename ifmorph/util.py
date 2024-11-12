@@ -387,8 +387,8 @@ def blend_frames(
         `f1` and `t=1` returns `f2`.
 
     blending_type: str
-        The blending method. May be any one of: linear src, dst, min, max,
-        seamless_{mix,clone}_{src,dst}
+        The blending method. May be any one of: linear src, tgt, min, max,
+        seamless_{mix,clone}_{src,tgt}
 
     Returns
     -------
@@ -410,7 +410,7 @@ def blend_frames(
         flags = cv2.MIXED_CLONE if "mix" in blending_type else cv2.NORMAL_CLONE
 
         # Invert source and target images.
-        if "dst" in blending_type:
+        if "tgt" in blending_type:
             f1, f2 = f2, f1
 
         f1np = f1.detach().cpu().numpy().astype(np.uint8)
