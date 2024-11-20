@@ -1,19 +1,19 @@
 # Neural Implicit Morphing of Face Images
 [Guilherme Schardong [1]](https://schardong.github.io/),
 [Tiago Novello [2]](https://sites.google.com/site/tiagonovellodebrito),
-[Hallison Paz [2]](https://hallisonpaz.com.br/)
-[Iurii Medvedev [1]](https://visteam.isr.uc.pt/team/iurii-medvedev)
+[Hallison Paz [2]](https://hallisonpaz.com.br/),
+[Iurii Medvedev [1]](https://visteam.isr.uc.pt/team/iurii-medvedev),
 [Vinícius da Silva [3]](https://dsilvavinicius.github.io/),
-[Luiz Velho [2]](https://lvelho.impa.br/)
+[Luiz Velho [2]](https://lvelho.impa.br/),
 [Nuno Gonçalves [1,4]](https://home.deec.uc.pt/~nunogon/)
 <br>
-[1] Institute of Systems and Robotics, University of Coimbra (UC)
+[1] Institute of Systems and Robotics, University of Coimbra (UC),
 <br>
 [2] Institute for Pure and Applied Mathematics (IMPA),
 <br>
 [3] Pontifical Catholic University of Rio de Janeiro (PUC-Rio),
 <br>
-[4] Portuguese Mint and Official Printing Office (INCM),
+[4] Portuguese Mint and Official Printing Office (INCM)
 
 This is the official implementation of "Neural Implicit Morphing of Face Images", published on the [Proceedings of CVPR 2024](https://openaccess.thecvf.com/content/CVPR2024/html/Schardong_Neural_Implicit_Morphing_of_Face_Images_CVPR_2024_paper.html), also on [arXiv](https://arxiv.org/abs/2308.13888). More results and examples in the [project page](https://schardong.github.io/ifmorph).
 
