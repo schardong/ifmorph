@@ -1,6 +1,6 @@
 dlib==19.24.4
 matplotlib==3.6.0
-mediapipe==0.9.1.0
+mediapipe==0.10.18
 numpy==1.23.3
 nvidia-cublas-cu11==11.10.3.66
 nvidia-cuda-nvrtc-cu11==11.7.99
