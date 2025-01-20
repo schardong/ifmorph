@@ -30,7 +30,7 @@ if __name__ == "__main__":
         " PTHs."
     )
     parser.add_argument(
-        "--outputdir", "-o", default=os.getcwd(),
+        "--output-path", "-o", default=os.getcwd(),
         help="Path to the output directory. By default is the current working"
         "directory, and the files are named \"frame_{checkpoint}_{t}.png\","
         " where \"checkpoint\" is the chosen checkpoint and \"t\" is the"
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     if args.landmarks:
         imbasename += "_landmarks"
     imbasename += ".png"
-    baseimpath = osp.join(osp.expanduser(args.outputdir), imbasename)
+    baseimpath = osp.join(osp.expanduser(args.output_path), imbasename)
 
     if args.timesteps:
         timesteps = [float(t) for t in args.timesteps]

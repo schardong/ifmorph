@@ -413,8 +413,10 @@ def blend_frames(
         if "tgt" in blending_type:
             f1, f2 = f2, f1
 
-        f1np = f1.detach().cpu().numpy().astype(np.uint8)
-        f2np = f2.detach().cpu().numpy().astype(np.uint8)
+        f1np = f1.detach().cpu().numpy()
+        f1np = (f1np * 255.).astype(np.uint8)
+        f2np = f2.detach().cpu().numpy()
+        f2np = (f2np * 255.).astype(np.uint8)
 
         landmarks = get_silhouette_lm(f1np, method="dlib").astype(np.int32)
 

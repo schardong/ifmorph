@@ -7,6 +7,7 @@ import os.path as osp
 import sys
 import cv2
 import torch
+from ifmorph.dataset import check_network_type, NotTorchFile
 from ifmorph.model import from_pth
 from ifmorph.util import get_landmarks_dlib, image_inference
 
@@ -14,14 +15,14 @@ from ifmorph.util import get_landmarks_dlib, image_inference
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Detects landmarks using DLib from a series of images"
-        " encoded as neural networks."
+        " which may be encoded as neural networks or not."
     )
     parser.add_argument(
-        "models", nargs="+", help="Path to the PyTorch files representing"
-        " face images."
+        "images", nargs="+", help="Path to the images or PyTorch files "
+        " representing face images."
     )
     parser.add_argument(
-        "--outputdir", "-o", default=".", help="Path to the output directory"
+        "--output-path", "-o", default=".", help="Path to the output directory"
         " where the landmark files will be stored. It will be created if it"
         " does not exists."
     )
@@ -32,13 +33,15 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dims", type=str, default="512,512", help="Image dimensions to"
-        " consider when running the inference. We use Width,Height notation."
-        " Note that DLib runs on a face image, thus larger images may result"
-        " in more precise landmark placement. Default is 512,512."
+        " consider when running the inference. Won't have any effect if the"
+        " images are not encoded as neural networks. We use width,height"
+        " notation. Note that DLib runs on a face image, thus larger images"
+        " may result in more precise landmark placement. Default is 512,512."
     )
     parser.add_argument(
         "--saveim", "-s", action="store_true", default=False, help="Saves the"
-        " output images."
+        " output images. Saves a copy of the input images if they are not"
+        " encoded as neural networks."
     )
     parser.add_argument(
         "--plot-landmarks", "-p", action="store_true", default=False,
@@ -56,22 +59,37 @@ if __name__ == "__main__":
     device = torch.device(devstr)
     dims = [int(d) for d in args.dims.split(",")]
 
-    if not osp.exists(args.outputdir):
-        os.makedirs(args.outputdir)
+    if not osp.exists(args.output_path):
+        os.makedirs(args.output_path)
 
     lmdict = {}
-    for modelname in args.models:
-        faceim = from_pth(modelname, device=device).eval()
-        img = image_inference(faceim, dims, device=device)
-        lms = get_landmarks_dlib(img).astype(float)
-        key = osp.splitext(osp.split(modelname)[1])[0]
+    for i, imname in enumerate(args.images):
+        if i % 10 == 0:
+            print(f"Processed {i}/{len(args.images)}.")
+
+        try:
+            _ = check_network_type(imname)
+        except NotTorchFile:
+            img = cv2.cvtColor(cv2.imread(imname), cv2.COLOR_BGR2RGB)
+        else:
+            faceim = from_pth(imname, device=device).eval()
+            img = image_inference(faceim, dims, device=device)
+
+        try:
+            lms = get_landmarks_dlib(img).astype(float)
+        except ValueError:
+            print(f"Failed to find landmarks for \"{imname}\". Skipping.")
+            continue
+        else:
+            key = osp.splitext(osp.split(imname)[1])[0]
 
         if args.saveim:
-            imname = osp.splitext(osp.split(modelname)[-1])[0] + ".png"
+            outimname = osp.splitext(osp.split(imname)[-1])[0] + ".png"
             if args.plot_landmarks:
-                img[lms[:, 0], lms[:, 1], :] = (0, 255, 0)
+                lms_copy = lms.astype(int)
+                img[lms_copy[:, 0], lms_copy[:, 1], :] = (0, 255, 0)
             cv2.imwrite(
-                osp.join(args.outputdir, imname),
+                osp.join(args.output_path, outimname),
                 cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             )
 
@@ -80,4 +98,4 @@ if __name__ == "__main__":
         lmdict[key] = lms
 
     for lmname, lm in lmdict.items():
-        lm.dump(osp.join(args.outputdir, lmname) + ".dat")
+        lm.dump(osp.join(args.output_path, lmname) + ".dat")

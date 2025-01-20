@@ -214,6 +214,8 @@ class ImageDataset(Dataset):
             iidx = torch.randint(self.coords.shape[0], (self.batch_size,))
         elif not isinstance(idx, torch.Tensor):
             iidx = torch.Tensor(idx)
+        else:
+            iidx = idx
         iidx = iidx.to(self.coords.device)
         return self.coords[iidx, ...], self.rgb[iidx, ...], iidx
 
