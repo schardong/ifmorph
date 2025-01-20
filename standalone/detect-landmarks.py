@@ -63,7 +63,10 @@ if __name__ == "__main__":
         os.makedirs(args.outputdir)
 
     lmdict = {}
-    for imname in args.images:
+    for i, imname in enumerate(args.images):
+        if i % 10 == 0:
+            print(f"Processed {i}/{len(args.images)}.")
+
         try:
             _ = check_network_type(imname)
         except NotTorchFile:
@@ -72,8 +75,13 @@ if __name__ == "__main__":
             faceim = from_pth(imname, device=device).eval()
             img = image_inference(faceim, dims, device=device)
 
-        lms = get_landmarks_dlib(img).astype(float)
-        key = osp.splitext(osp.split(imname)[1])[0]
+        try:
+            lms = get_landmarks_dlib(img).astype(float)
+        except ValueError:
+            print(f"Failed to find landmarks for \"{imname}\". Skipping.")
+            continue
+        else:
+            key = osp.splitext(osp.split(imname)[1])[0]
 
         if args.saveim:
             outimname = osp.splitext(osp.split(imname)[-1])[0] + ".png"

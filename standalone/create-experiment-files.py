@@ -62,8 +62,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "imagedir", help="Path to the input images folder. Note that the"
-        " images must be encoded as neural networks, thus their filenames must"
-        " end in \".pt{h}\"."
+        " images may be encoded as neural networks or normal images."
+        " If encoded as neural networks, we expect their filenames to end in "
+        " \".pt{h}\"."
     )
     parser.add_argument(
         "outputdir", help="Path to the output experiment files. All saved in"
@@ -103,27 +104,42 @@ if __name__ == "__main__":
         os.makedirs(args.outputdir)
 
     LMDIR = args.lmdir if args.lmdir else args.imagedir
-    modelnames = dict()
+    imagenames = dict()
     for f in os.listdir(args.imagedir):
-        if ".pt" in f:
-            modelnames[osp.splitext(f)[0]] = osp.join(args.imagedir, f)
-    lmfnames = [f for f in os.listdir(LMDIR) if f.endswith(".dat")]
+        if "DS_Store" in f:
+            continue
 
+        fname = osp.join(args.imagedir, f)
+        if osp.isdir(fname):
+            continue
+
+        imagenames[osp.splitext(f)[0]] = osp.join(args.imagedir, f)
+
+    lmfnames = [f for f in os.listdir(LMDIR) if f.endswith(".dat")]
     # Pre-loading landmarks once to avoid overloading the disk
     lmdict = {}
     for fname in lmfnames:
         lmdict[osp.splitext(fname)[0]] = np.load(
-            osp.join(args.imagedir, fname), allow_pickle=True
+            osp.join(LMDIR, fname), allow_pickle=True
         )
 
     for src, tgtlist in pairs_morphing.items():
         for tgt in tgtlist:
             config = DEFAULT_EXP_CONFIG
             config["initial_conditions"] = {
-                "0": osp.join(modelnames[src]),
-                "1": osp.join(modelnames[tgt]),
+                "0": osp.join(imagenames[src]),
+                "1": osp.join(imagenames[tgt]),
             }
-            config["loss"]["sources"] = lmdict[src].tolist()
-            config["loss"]["targets"] = lmdict[tgt].tolist()
+            try:
+                config["loss"]["sources"] = lmdict[src].tolist()
+            except KeyError:
+                print(f"No landmarks for \"{src}\". Skipping.")
+                continue
+            try:
+                config["loss"]["targets"] = lmdict[tgt].tolist()
+            except KeyError:
+                print(f"No landmarks for \"{tgt}\". Skipping.")
+                continue
+
             with open(osp.join(args.outputdir, f"{src}-{tgt}.yaml"), "w+") as fout:
                 yaml.dump(config, fout)
