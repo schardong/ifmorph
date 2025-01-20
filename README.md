@@ -21,7 +21,7 @@ This is the official implementation of "Neural Implicit Morphing of Face Images"
 
 ## Getting started
 
-**TL-DR**: If you just want to run the code, follow the steps below (assuming a UNIX system with Make installed). For more details, jump to `Setup and sample run` section.
+**TL-DR**: If you just want to run the code, follow the steps below (assuming a UNIX-like system with Make installed). For more details, jump to `Setup and sample run` section.
 
 ```{sh}
 python -m venv .venv
@@ -31,6 +31,7 @@ pip install -e .
 make data/frll_neutral_front
 python mark-warp-points.py --landmark_detector dlib --output experiments/001_002.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
 python warp-train.py --no-ui experiments/001_002.yaml
+python warp-inference-image.py --output_path results/001_002/ --timesteps 0.5 --blending linear results/001_002/config.yaml
 ```
 
 ### Prerequisites
@@ -109,18 +110,21 @@ Download the [Face Research Lab London](https://figshare.com/articles/dataset/Fa
 An optional pre-processing step is implemented in a modified version of the `align.py` script, provided by the [DiffAE](https://github.com/phizaz/diffae) authors (which they extracted from the FFHQ pre-processing script) to crop and resize the images. We modified it to allow for a "non-alignment", thus the images are cropped and resized, but not necessarilly aligned. For the quantitative comparisons, the images need to be pre-processed by the `align.py` script, since the other models assume the face to occupy a central (and large) part of the image.
 
 #### How to run
-0. (Optional) Crop/resize the images
-1. (Optional) Create the initial neural implicit representation of your target images (note that wildcards are accepted)
-2. Create the face landmarks manually ou automatically
-3. Run the warp training script
+1. (Optional) Crop/resize the images
+2. (Optional) Create the initial neural implicit representation of your target images (note that wildcards are accepted)
+3. Create the face landmarks manually ou automatically
+4. Create the warping experiment files
+5. Run the warp training script
+6. Run the warping inference script
 
 In an Ubuntu 22.04 system, the commands below should do it. Note that the optional parameters have default values, thus you don't need to specify them. We do it here for some of them to demonstrate possible values:
 
 ```{sh}
-(OPTIONAL) python align.py --just-crop --output-size 1024 --n-tasks 4 data/frll/ data/frll_neutral_front_cropped
-(OPTIONAL) python create-initial-states.py --nsteps 1000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
-python mark-warp-points.py data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg
-python warp-train.py experiments/001_002-baseline.yaml
+(OPTIONAL) python align.py --just-crop --output-size 1024 --n-tasks 4 data/frll/ data/frll_neutral_front_cropped  # Step 1
+(OPTIONAL) python create-initial-states.py --nsteps 1000 --device cuda:0 experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg  # Step 2
+python mark-warp-points.py data/frll_neutral_front/001_03.jpg data/frll_neutral_front/002_03.jpg  # Steps 3 and 4
+python warp-train.py experiments/001_002-baseline.yaml  # Step 5
+python warp-inference-image.py --timesteps 0.5 --blending linear results/001_002-baseline/config.yaml  # Step 6
 ```
 
 Additionally, we provide a `Makefile` with the source code, that trains the initial states (or downloads them from [here](https://drive.google.com/file/d/1QYoprK2bycXHItSkx9H8JfMGz48B9a3N/view?usp=sharing) or [here](https://drive.google.com/file/d/1guMg5ablWDQgaSfr5sFwScPWa-gm5Vsz/view?usp=sharing) if you want the cropped images) and runs the example warping experiment.
@@ -129,28 +133,82 @@ Additionally, we provide a `Makefile` with the source code, that trains the init
 To avoid cluttering the repository, we've opted to store the experiment configuration files externally. You can generate them after following the *Setup* procedure above. For convenience, you can download the experiment files from [here](https://drive.google.com/file/d/1S1J_lsuGxPeU3DMOJMinXSjHGi91m9Ru/view?usp=sharing) and pretrained image networks from [here](https://drive.google.com/file/d/1QYoprK2bycXHItSkx9H8JfMGz48B9a3N/view?usp=sharing). Also, see the **Makefile** for rules that automate this process. However, we describe the steps to recreate those files below. We always assume that the commands are typed from the repository root. Additionally, we assume that the python environment is activated. First, you must crop and resize the FRLL face images, afterwards you must create the neural initial states. You can do so by typing:
 
 ```{sh}
-python standalone/align.py --just-crop --output-size 1350 --n-tasks 4 data/frll_neutral_front/ data/frll_neutral_front_cropped
-python standalone/create-initial-states.py --nsteps 5000 --device cuda:0 --output_path pretrained/frll_neutral_front_cropped experiments/initial_state_rgb_large_im.yaml data/frll_neutral_front_cropped/*.png
+python standalone/align.py \
+    --just-crop \
+    --output-size 1350 \
+    --n-tasks 4 \
+    data/frll_neutral_front/ \
+    data/frll_neutral_front_cropped
+
+python standalone/create-initial-states.py \
+    --nsteps 5000 \
+    --device cuda:0 \
+    --output-path pretrained/frll_neutral_front_cropped \
+    experiments/initial_state_rgb_large_im.yaml \
+    data/frll_neutral_front_cropped/*.png
 ```
 
 Note that `data/frll_neutral_front_cropped` is not in the repository as well. You can download the original images from the FRLL repository (see our **Makefile**) and crop them using the first command above.
 This will store all images in `data/frll_neutral_front_cropped` in the `pretrained/frll_neutral_front_croppped` folder. Afterwards, run the script to detect the landmarks, followed by the script to create the experiment configuration files:
 
 ```{sh}
-python standalone/detect-landmarks.py -o pretrained/frll_neutral_front_cropped/ pretrained/frll_neutral_front_cropped/*.pth
-python standalone/create-experiment-files.py data/pairs_for_morphing_full.txt pretrained/frll_neutral_front_cropped/ experiments/pairwise_dlib
+python standalone/detect-landmarks.py \
+    --output-path pretrained/frll_neutral_front_cropped/ \
+    pretrained/frll_neutral_front_cropped/*.pth
+
+python standalone/create-experiment-files.py \
+    data/pairs_for_morphing_full.txt \
+    pretrained/frll_neutral_front_cropped/ \
+    experiments/pairwise_dlib
 ```
 
-Finally, you can simply train the warpings by issuing the following command:
+You can train the warpings by issuing the following command:
 
 ```{sh}
-python warp-train.py experiments/pairwise_dlib/*.yaml --no-ui --logging none --device cuda:0 --output-dir results/pairwise_dlib --skip-finished --no-reconstruction
+python warp-train.py \
+    --no-ui --skip-finished --no-reconstruction \
+    --logging none \
+    --device cuda:0 \
+    --output-path results/pairwise_dlib \
+    experiments/pairwise_dlib/*.yaml
 ```
 
 The above command will run the trainings sequentially. However, if you may notice that your GPU is underutilized. In this case, you may run the `warp-train.py` script setting the `--n-tasks` parameter to any value larger than 1, as shown below. In this case, it will run multiple trainings in parallel *in the same GPU*. Tweak `--n-tasks` accordingly.
 
 ```{sh}
-python warp-train.py experiments/pairwise_dlib/*.yaml --no-ui --logging none --device cuda:0 --output-path results/pairwise_dlib --n-tasks 6 --skip-finished --no-reconstruction
+python warp-train.py \
+    --no-ui --skip-finished --no-reconstruction \
+    --logging none \
+    --device cuda:0 \
+    --output-path results/pairwise_dlib \
+    --n-tasks 6 \
+    experiments/pairwise_dlib/*.yaml
+```
+
+Finally, to generate a morphing for a single experiment, run the `warp-inference-image.py` script, as shown below:
+
+```{sh}
+python warp-inference-image.py \
+    --output_path results/blendings/001_002 \
+    --timesteps 0.5  \
+    --blending linear \
+    results/pairwise_dlib/001_002/config.yaml
+```
+
+To generate the morphings *for all experiments*, run the following excerpt **in bash**:
+
+```{sh}
+BLENDINGS=(linear seamless_mix seamless_normal)
+EXPS=$(ls results/pairwise_dlib)
+for E in ${EXPS[@]}; do
+    for B in ${BLENDINGS[@]}; do
+        python warp-inference-image.py \
+            --output_path results/blendings/${E} \
+            --timesteps 0.5 \
+            --blending ${B} \
+            results/pairwise_dlib/${E}/config.yaml
+    done
+done
 ```
 
 ## Contributing
