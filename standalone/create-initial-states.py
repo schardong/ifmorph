@@ -23,7 +23,7 @@ if __name__ == "__main__":
     parser.add_argument("config_path", help="Path to the configuration file.")
     parser.add_argument("images", nargs="+", help="Path to the input images.")
     parser.add_argument(
-        "--output_path", default="pretrained",
+        "--output-path", default="pretrained",
         help="Folder to store the resulting nets (and optionally, inferences)"
     )
     parser.add_argument(
@@ -59,9 +59,8 @@ if __name__ == "__main__":
     with open(args.config_path, "r") as fin:
         config = yaml.safe_load(fin)
 
-    output_path = osp.join(os.getcwd(), args.output_path)
-    if not osp.exists(output_path):
-        os.makedirs(output_path)
+    if not osp.exists(args.output_path):
+        os.makedirs(args.output_path)
 
     devstr = args.device
     if "cuda" in devstr and not torch.cuda.is_available():
@@ -143,7 +142,7 @@ if __name__ == "__main__":
         out_basename = osp.split(fname)[1].split(".")[0]
         torch.save(
             model.state_dict(),
-            osp.join(output_path, out_basename + ".pth")
+            osp.join(args.output_path, out_basename + ".pth")
         )
 
         if not args.no_reconstruction:
@@ -163,7 +162,7 @@ if __name__ == "__main__":
             sz = [img.size[0], img.size[1], n_channels]
             rec = rec.reshape(sz).permute((2, 0, 1))
             img = to_pil_image(rec)
-            out_img_path = osp.join(output_path, out_basename + ".png")
+            out_img_path = osp.join(args.output_path, out_basename + ".png")
             img.save(out_img_path)
             print(f"Image saved as: {out_img_path}")
 

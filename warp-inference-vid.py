@@ -28,7 +28,7 @@ if __name__ == "__main__":
         " PTHs."
     )
     parser.add_argument(
-        "--outputdir", "-o", default=os.getcwd(),
+        "--output-path", "-o", default=os.getcwd(),
         help="Path to the output file. By default is the current working"
         "directory , and the file is named after the chosen checkpoint, or"
         " \"video.mp4\" for the final checkpoint."
@@ -119,10 +119,10 @@ if __name__ == "__main__":
     if args.landmarks:
         vidfilename += "_landmarks"
     vidfilename += ".mp4"
-    if not args.outputdir:
+    if not args.output_path:
         vidpath = osp.join(basepath, vidfilename)
     else:
-        vidpath = osp.join(args.outputdir, vidfilename)
+        vidpath = osp.join(args.output_path, vidfilename)
 
     timerange = reconstruct_config.get("timerange", [-1, 1])
     n_frames = reconstruct_config.get("n_frames", 100)

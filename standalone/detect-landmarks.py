@@ -22,7 +22,7 @@ if __name__ == "__main__":
         " representing face images."
     )
     parser.add_argument(
-        "--outputdir", "-o", default=".", help="Path to the output directory"
+        "--output-path", "-o", default=".", help="Path to the output directory"
         " where the landmark files will be stored. It will be created if it"
         " does not exists."
     )
@@ -59,8 +59,8 @@ if __name__ == "__main__":
     device = torch.device(devstr)
     dims = [int(d) for d in args.dims.split(",")]
 
-    if not osp.exists(args.outputdir):
-        os.makedirs(args.outputdir)
+    if not osp.exists(args.output_path):
+        os.makedirs(args.output_path)
 
     lmdict = {}
     for i, imname in enumerate(args.images):
@@ -89,7 +89,7 @@ if __name__ == "__main__":
                 lms_copy = lms.astype(int)
                 img[lms_copy[:, 0], lms_copy[:, 1], :] = (0, 255, 0)
             cv2.imwrite(
-                osp.join(args.outputdir, outimname),
+                osp.join(args.output_path, outimname),
                 cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             )
 
@@ -98,4 +98,4 @@ if __name__ == "__main__":
         lmdict[key] = lms
 
     for lmname, lm in lmdict.items():
-        lm.dump(osp.join(args.outputdir, lmname) + ".dat")
+        lm.dump(osp.join(args.output_path, lmname) + ".dat")

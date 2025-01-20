@@ -67,7 +67,7 @@ if __name__ == "__main__":
         " \".pt{h}\"."
     )
     parser.add_argument(
-        "outputdir", help="Path to the output experiment files. All saved in"
+        "output-path", help="Path to the output experiment files. All saved in"
         " YAML format."
     )
     parser.add_argument(
@@ -100,8 +100,8 @@ if __name__ == "__main__":
         else:
             pairs_morphing[f1].append(f2)
 
-    if not osp.exists(args.outputdir):
-        os.makedirs(args.outputdir)
+    if not osp.exists(args.output_path):
+        os.makedirs(args.output_path)
 
     LMDIR = args.lmdir if args.lmdir else args.imagedir
     imagenames = dict()
@@ -141,5 +141,5 @@ if __name__ == "__main__":
                 print(f"No landmarks for \"{tgt}\". Skipping.")
                 continue
 
-            with open(osp.join(args.outputdir, f"{src}-{tgt}.yaml"), "w+") as fout:
+            with open(osp.join(args.output_path, f"{src}-{tgt}.yaml"), "w+") as fout:
                 yaml.dump(config, fout)

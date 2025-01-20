@@ -103,7 +103,7 @@ if __name__ == "__main__":
         " device is found."
     )
     parser.add_argument(
-        "--no_ui", "-n", action="store_true", help="Don't open the point"
+        "--no-ui", "-n", action="store_true", help="Don't open the point"
         " editing UI. Useful for batch runs. Note that for this option to be"
         " useful, \"--landmark_detector\" must not be empty."
     )
