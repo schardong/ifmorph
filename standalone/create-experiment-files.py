@@ -67,7 +67,7 @@ if __name__ == "__main__":
         " \".pt{h}\"."
     )
     parser.add_argument(
-        "output-path", help="Path to the output experiment files. All saved in"
+        "output_path", help="Path to the output experiment files. All saved in"
         " YAML format."
     )
     parser.add_argument(
