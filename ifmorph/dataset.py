@@ -3,6 +3,7 @@
 
 import math
 import os.path as osp
+import cv2
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
@@ -156,7 +157,8 @@ class ImageDataset(Dataset):
             self.batch_size = batch_size
 
     def pixels(self, coords=None):
-        """
+        """Returns the pixels of the image at `coords`.
+
         Parameters
         ----------
         coords: torch.Tensor
@@ -174,13 +176,20 @@ class ImageDataset(Dataset):
         intcoords = intcoords.clamp(self.coords.min(), self.coords.max())
         intcoords[..., 0] *= self.size[0]
         intcoords[..., 1] *= self.size[1]
-        intcoords = intcoords.floor().long()
-        rgb = torch.zeros_like(self.rgb, device=self.coords.device)
-        rgb = self.rgb[
-            (intcoords[..., 0] * self.size[0]) + intcoords[..., 1],
-            ...
-        ]
-        return rgb
+        mx = intcoords[..., 0].reshape(self.size)
+        my = intcoords[..., 1].reshape(self.size)
+
+        rgb = self.rgb.detach().clone().reshape([*self.size, self.n_channels]).numpy()
+        rgb = cv2.remap(rgb, my.numpy(), mx.numpy(), interpolation=cv2.INTER_AREA)
+        return torch.Tensor(rgb).float().to(self.coords.device)
+
+        # intcoords = intcoords.floor().long()
+        # rgb = torch.zeros_like(self.rgb, device=self.coords.device)
+        # rgb = self.rgb[
+        #     (intcoords[..., 0] * self.size[0]) + intcoords[..., 1],
+        #     ...
+        # ]
+        # return rgb
 
     def __len__(self):
         return math.ceil(self.rgb.shape[0] / self.batch_size)
