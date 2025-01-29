@@ -407,11 +407,15 @@ def blend_frames(
     elif "tgt" in blending_type:
         rec = f2
     elif "seamless" in blending_type:
-        flags = cv2.MIXED_CLONE if "mix" in blending_type else cv2.NORMAL_CLONE
-
         # Invert source and target images.
         if "tgt" in blending_type:
             f1, f2 = f2, f1
+
+        flags = cv2.NORMAL_CLONE
+        if "mix" in blending_type:
+            flags = cv2.MIXED_CLONE
+        else:
+            f2 = (1 - t) * f1 + t * f2
 
         f1np = f1.detach().cpu().numpy()
         f1np = (f1np * 255.).astype(np.uint8)
