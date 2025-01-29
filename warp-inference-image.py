@@ -65,7 +65,7 @@ if __name__ == "__main__":
         " space, e.g. \"-f 800 600\"."
     )
     parser.add_argument(
-        "--blending", "-b", default="linear",
+        "--blending-types", "-b", default="linear", nargs='+',
         help="The type of blending to use. May be any of \"linear\", \"min\","
         " \"max\", \"dist\", \"src\", \"tgt\","
         " \"seamless_{normal,mix}_{src,tgt}\". Note that for"
@@ -138,7 +138,6 @@ if __name__ == "__main__":
     if args.timesteps:
         timesteps = [float(t) for t in args.timesteps]
 
-    blending_type = args.blending
     grid = get_grid(grid_dims).to(device).requires_grad_(False)
     with torch.no_grad():
         for t in timesteps:
@@ -163,41 +162,49 @@ if __name__ == "__main__":
                     grid, 1-t, model, initialstates[1], grid_dims, bggray=255
                 )
 
-            frame = blend_frames(rec0, rec1, t, blending_type)
-            if args.landmarks:
-                color = None
-                lms = None
-                ts = None
-                if blending_type == "src":
-                    color = (225, 0, 0)
-                    lms = config["loss"]["sources"]
-                    ts = t
-                elif blending_type == "tgt":
-                    color = (0, 225, 0)
-                    lms = config["loss"]["targets"]
-                    ts = t - 1
-                else:
-                    color = [(225, 0, 0), (0, 225, 0)]
-                    lms = [
-                        config["loss"]["sources"],
-                        config["loss"]["targets"]
-                    ]
-                    ts = [t, t - 1]
+            if isinstance(args.blending_types, (list, tuple)):
+                for blending_opt in args.blending_types:
+                    frame = blend_frames(rec0, rec1, t, blending_opt)
 
-                if isinstance(lms, list):
-                    for c, lm, t2 in zip(color, lms, ts):
-                        lm, _ = warp_points(
-                            model, torch.Tensor(lm).to(device=device).float(), t2
-                        ).detach().cpu().numpy()
-                        frame = plot_landmarks(frame, lm, c=c, r=3)
-                else:
-                    lm, _ = warp_points(
-                        model, torch.Tensor(lms).to(device=device).float(), ts
-                    ).detach().cpu().numpy()
-                    frame = plot_landmarks(frame, lm=lm, c=color, r=3)
+                    if args.landmarks:
+                        color = None
+                        lms = None
+                        ts = None
+                        if blending_opt == "src":
+                            color = (225, 0, 0)
+                            lms = config["loss"]["sources"]
+                            ts = t
+                        elif blending_opt == "tgt":
+                            color = (0, 225, 0)
+                            lms = config["loss"]["targets"]
+                            ts = t - 1
+                        else:
+                            color = [(225, 0, 0), (0, 225, 0)]
+                            lms = [
+                                config["loss"]["sources"],
+                                config["loss"]["targets"]
+                            ]
+                            ts = [t, t - 1]
 
-            impath = baseimpath.format(t, blending_type)
-            cv2.imwrite(
-                impath, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            )
-            print(f"Output image at {t} written to \"{impath}\"")
+                        if isinstance(lms, list):
+                            for c, lm, t2 in zip(color, lms, ts):
+                                lm, _ = warp_points(
+                                    model,
+                                    torch.Tensor(lm).to(device=device).float(),
+                                    t2
+                                ).detach().cpu().numpy()
+                                frame = plot_landmarks(frame, lm, c=c, r=3)
+                        else:
+                            lm, _ = warp_points(
+                                model,
+                                torch.Tensor(lms).to(device=device).float(),
+                                ts
+                            ).detach().cpu().numpy()
+                            frame = plot_landmarks(frame, lm=lm, c=color, r=3)
+
+                    impath = baseimpath.format(t, blending_opt)
+                    cv2.imwrite(
+                        impath, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    )
+                    print(f"Output image at {t} for blending {blending_opt}"
+                          f" written to \"{impath}\"")
