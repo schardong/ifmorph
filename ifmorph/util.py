@@ -399,7 +399,8 @@ def plot_landmarks(im: np.array, landmarks: np.array, c=(0, 255, 0), r=1) -> np.
 
 
 def blend_frames(
-        f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: str
+        f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: str,
+        landmark_detection: str="mediapipe"
 ) -> np.array:
     """Blends frames `f1` and `f2` following `blending_type`.
 
@@ -416,8 +417,8 @@ def blend_frames(
         `f1` and `t=1` returns `f2`.
 
     blending_type: str
-        The blending method. May be any one of: linear src, tgt, min, max,
-        seamless_{mix,clone}_{src,tgt}
+        The blending method. May be any one of: linear{_masked}, src, tgt, min,
+        max, seamless_{mix,clone}_{src,tgt}
 
     Returns
     -------
@@ -451,7 +452,7 @@ def blend_frames(
         f2np = f2.detach().cpu().numpy()
         f2np = (f2np * 255.).astype(np.uint8)
 
-        landmarks = get_silhouette_lm(f1np, method="dlib").astype(np.int32)
+        landmarks = get_silhouette_lm(f1np, method=landmark_detection).astype(np.int32)
 
         mask = np.zeros(f2.shape, dtype=np.uint8)
         mask = cv2.fillPoly(
