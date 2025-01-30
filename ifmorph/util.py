@@ -100,7 +100,7 @@ def get_grid(dims, requires_grad=False, list_of_coords=True):
     return mgrid
 
 
-def get_silhouette_lm(img, method="dlib"):
+def get_silhouette_lm(img: np.ndarray, method: str="dlib"):
     """Returns the silhouette landmarks from `img` in pixel coordinates.
 
     Parameters
@@ -139,6 +139,35 @@ def get_silhouette_lm(img, method="dlib"):
             p = shape.part(i)
             landmarks.append((p.x, p.y))
         landmarks = np.array(landmarks)[maskpts]
+    else:
+        from mediapipe.tasks.python import BaseOptions
+        from mediapipe.tasks.python import vision
+
+        baseopts = BaseOptions(
+            model_asset_path=osp.join("landmark_models", "face_landmarker.task"),
+        )
+        lmopts = vision.FaceLandmarkerOptions(
+            base_options=baseopts, output_face_blendshapes=False,
+            output_facial_transformation_matrixes=False, num_faces=1,
+            running_mode=vision.RunningMode.IMAGE,
+            min_face_detection_confidence=0.5,
+            min_face_presence_confidence=0.5
+        )
+        detector = vision.FaceLandmarker.create_from_options(lmopts)
+
+        mpim = mp.Image(image_format=mp.ImageFormat.SRGB, data=img)
+        detections = detector.detect(mpim)
+        landmarks = detections.face_landmarks[0]
+
+        landmarks = np.array([[lm.x, lm.y] for lm in landmarks])
+        landmarks[:, 0] *= img.shape[1]
+        landmarks[:, 1] *= img.shape[0]
+        landmarks = landmarks.astype(np.int32)
+        landmarks = landmarks[[
+            10, 109, 67, 103, 54, 21, 162, 127, 234, 93, 132, 58, 172, 136,
+            150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397, 288, 361,
+            323, 454, 356, 389, 251, 284, 332, 297, 338], :
+        ]
 
     return landmarks
 
