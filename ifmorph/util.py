@@ -448,9 +448,11 @@ def blend_frames(
             f2 = (1 - t) * f1 + t * f2
 
         f1np = f1.detach().cpu().numpy()
-        f1np = (f1np * 255.).astype(np.uint8)
-        f2np = f2.detach().cpu().numpy()
-        f2np = (f2np * 255.).astype(np.uint8)
+        if f1np.max() <= 1.0:
+            f1np *= 255.
+        if f2np.max() <= 1.0:
+            f2np *= 255
+        f2np = f2np.astype(np.uint8)
 
         landmarks = get_silhouette_lm(f1np, method=landmark_detection).astype(np.int32)
 
