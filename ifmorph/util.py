@@ -428,6 +428,43 @@ def blend_frames(
     """
     if blending_type == "linear":
         rec = (1 - t) * f1 + t * f2
+    elif blending_type == "linear_masked":
+        f1np = f1.detach().cpu().numpy()
+        if f1np.max() <= 1.0:
+            f1np *= 255.
+        f1np = f1np.astype(np.uint8)
+        
+        f2np = f2.detach().cpu().numpy()
+        if f2np.max() <= 1.0:
+            f2np *= 255.
+        f2np = f2np.astype(np.uint8)
+
+        landmarks = get_silhouette_lm(
+            f1np, method=landmark_detection
+        ).astype(np.int32)
+        mask = np.zeros(f2.shape, dtype=np.uint8)
+        mask_full = cv2.fillPoly(
+            mask, np.array([landmarks], dtype=np.int32), (255, 255, 255)
+        )
+        mask = mask_full[..., 0]
+
+        f1_masked = cv2.bitwise_and(f1np, f1np, mask=mask)
+        f2_masked = cv2.bitwise_and(f2np, f2np, mask=mask)
+
+        ft_masked = (1 - t) * f1_masked + t * f2_masked
+        rec = cv2.bitwise_and(f1np, f1np, mask=cv2.bitwise_not(mask))
+        rec = rec.astype(np.uint8)
+
+        # Use seamless cloning to blend the masked interpolation with the
+        # background
+        br = cv2.boundingRect(mask)
+        center = (int(br[0] + br[2] / 2), int(br[1] + br[3] / 2))
+
+        rec = cv2.seamlessClone(
+            ft_masked.astype(np.uint8), f1np, mask_full, p=center,
+            flags=cv2.NORMAL_CLONE
+        )
+
     elif "min" in blending_type:
         rec = torch.minimum(f1, f2)
     elif "max" in blending_type:
@@ -450,6 +487,9 @@ def blend_frames(
         f1np = f1.detach().cpu().numpy()
         if f1np.max() <= 1.0:
             f1np *= 255.
+        f1np = f1np.astype(np.uint8)
+
+        f2np = f2.detach().cpu().numpy()
         if f2np.max() <= 1.0:
             f2np *= 255
         f2np = f2np.astype(np.uint8)
