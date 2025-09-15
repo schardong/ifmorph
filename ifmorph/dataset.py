@@ -297,7 +297,7 @@ class WarpingDataset(Dataset):
             N = self.num_samples // 2
             m = int(math.sqrt(N))
             self.coords = get_grid([m, m]).to(self.device)
-            self.int_times = 2 * (torch.arange(0, N, 1, device=self.device, dtype=torch.float32) - (N / 2)) / N
+            self.int_times = 2 * (torch.arange(0, m * m, 1, device=self.device, dtype=torch.float32) - (N / 2)) / N
 
     @property
     def initial_conditions(self):
@@ -318,7 +318,8 @@ class WarpingDataset(Dataset):
         N = self.num_samples // 2
 
         if self.grid_sampling:
-            int_times = self.int_times[torch.randperm(N, device=self.device)]
+            m = int(math.sqrt(N))
+            int_times = self.int_times[torch.randperm(m * m, device=self.device)]
         else:
             self.coords = torch.rand((N, 2), device=self.device) * 2 - 1
             # Temporal coordinates \in (0, 1), renormalized to the actual time
