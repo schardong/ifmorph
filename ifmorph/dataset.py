@@ -3,6 +3,7 @@
 
 import math
 import os.path as osp
+import cv2
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
@@ -156,7 +157,8 @@ class ImageDataset(Dataset):
             self.batch_size = batch_size
 
     def pixels(self, coords=None):
-        """
+        """Returns the pixels of the image at `coords`.
+
         Parameters
         ----------
         coords: torch.Tensor
@@ -174,13 +176,13 @@ class ImageDataset(Dataset):
         intcoords = intcoords.clamp(self.coords.min(), self.coords.max())
         intcoords[..., 0] *= self.size[0]
         intcoords[..., 1] *= self.size[1]
-        intcoords = intcoords.floor().long()
-        rgb = torch.zeros_like(self.rgb, device=self.coords.device)
-        rgb = self.rgb[
-            (intcoords[..., 0] * self.size[0]) + intcoords[..., 1],
-            ...
-        ]
-        return rgb
+        N = int(math.sqrt(coords.shape[0]))
+        mx = intcoords[..., 0].reshape([N, N])
+        my = intcoords[..., 1].reshape([N, N])
+
+        rgb = self.rgb.detach().clone().reshape([*self.size, self.n_channels]).numpy()
+        rgb = cv2.remap(rgb, my.numpy(), mx.numpy(), interpolation=cv2.INTER_AREA)
+        return torch.Tensor(rgb).float().to(self.coords.device)
 
     def __len__(self):
         return math.ceil(self.rgb.shape[0] / self.batch_size)
@@ -288,7 +290,7 @@ class WarpingDataset(Dataset):
             N = self.num_samples // 2
             m = int(math.sqrt(N))
             self.coords = get_grid([m, m]).to(self.device)
-            self.int_times = 2 * (torch.arange(0, N, 1, device=self.device, dtype=torch.float32) - (N / 2)) / N
+            self.int_times = 2 * (torch.arange(0, m * m, 1, device=self.device, dtype=torch.float32) - (N / 2)) / N
 
     @property
     def initial_conditions(self):
@@ -309,7 +311,8 @@ class WarpingDataset(Dataset):
         N = self.num_samples // 2
 
         if self.grid_sampling:
-            int_times = self.int_times[torch.randperm(N, device=self.device)]
+            m = int(math.sqrt(N))
+            int_times = self.int_times[torch.randperm(m * m, device=self.device)]
         else:
             self.coords = torch.rand((N, 2), device=self.device) * 2 - 1
             # Temporal coordinates \in (0, 1), renormalized to the actual time

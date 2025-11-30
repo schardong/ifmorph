@@ -100,7 +100,7 @@ def get_grid(dims, requires_grad=False, list_of_coords=True):
     return mgrid
 
 
-def get_silhouette_lm(img, method="dlib"):
+def get_silhouette_lm(img: np.ndarray, method: str="dlib"):
     """Returns the silhouette landmarks from `img` in pixel coordinates.
 
     Parameters
@@ -139,6 +139,35 @@ def get_silhouette_lm(img, method="dlib"):
             p = shape.part(i)
             landmarks.append((p.x, p.y))
         landmarks = np.array(landmarks)[maskpts]
+    else:
+        from mediapipe.tasks.python import BaseOptions
+        from mediapipe.tasks.python import vision
+
+        baseopts = BaseOptions(
+            model_asset_path=osp.join("landmark_models", "face_landmarker.task"),
+        )
+        lmopts = vision.FaceLandmarkerOptions(
+            base_options=baseopts, output_face_blendshapes=False,
+            output_facial_transformation_matrixes=False, num_faces=1,
+            running_mode=vision.RunningMode.IMAGE,
+            min_face_detection_confidence=0.5,
+            min_face_presence_confidence=0.5
+        )
+        detector = vision.FaceLandmarker.create_from_options(lmopts)
+
+        mpim = mp.Image(image_format=mp.ImageFormat.SRGB, data=img)
+        detections = detector.detect(mpim)
+        landmarks = detections.face_landmarks[0]
+
+        landmarks = np.array([[lm.x, lm.y] for lm in landmarks])
+        landmarks[:, 0] *= img.shape[1]
+        landmarks[:, 1] *= img.shape[0]
+        landmarks = landmarks.astype(np.int32)
+        landmarks = landmarks[[
+            10, 109, 67, 103, 54, 21, 162, 127, 234, 93, 132, 58, 172, 136,
+            150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397, 288, 361,
+            323, 454, 356, 389, 251, 284, 332, 297, 338], :
+        ]
 
     return landmarks
 
@@ -370,7 +399,8 @@ def plot_landmarks(im: np.array, landmarks: np.array, c=(0, 255, 0), r=1) -> np.
 
 
 def blend_frames(
-        f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: str
+        f1: torch.Tensor, f2: torch.Tensor, t: float, blending_type: str,
+        landmark_detection: str="mediapipe"
 ) -> np.array:
     """Blends frames `f1` and `f2` following `blending_type`.
 
@@ -387,8 +417,8 @@ def blend_frames(
         `f1` and `t=1` returns `f2`.
 
     blending_type: str
-        The blending method. May be any one of: linear src, tgt, min, max,
-        seamless_{mix,clone}_{src,tgt}
+        The blending method. May be any one of: linear{_masked}, src, tgt, min,
+        max, seamless_{mix,clone}_{src,tgt}
 
     Returns
     -------
@@ -398,6 +428,43 @@ def blend_frames(
     """
     if blending_type == "linear":
         rec = (1 - t) * f1 + t * f2
+    elif blending_type == "linear_masked":
+        f1np = f1.detach().cpu().numpy()
+        if f1np.max() <= 1.0:
+            f1np *= 255.
+        f1np = f1np.astype(np.uint8)
+        
+        f2np = f2.detach().cpu().numpy()
+        if f2np.max() <= 1.0:
+            f2np *= 255.
+        f2np = f2np.astype(np.uint8)
+
+        landmarks = get_silhouette_lm(
+            f1np, method=landmark_detection
+        ).astype(np.int32)
+        mask = np.zeros(f2.shape, dtype=np.uint8)
+        mask_full = cv2.fillPoly(
+            mask, np.array([landmarks], dtype=np.int32), (255, 255, 255)
+        )
+        mask = mask_full[..., 0]
+
+        f1_masked = cv2.bitwise_and(f1np, f1np, mask=mask)
+        f2_masked = cv2.bitwise_and(f2np, f2np, mask=mask)
+
+        ft_masked = (1 - t) * f1_masked + t * f2_masked
+        rec = cv2.bitwise_and(f1np, f1np, mask=cv2.bitwise_not(mask))
+        rec = rec.astype(np.uint8)
+
+        # Use seamless cloning to blend the masked interpolation with the
+        # background
+        br = cv2.boundingRect(mask)
+        center = (int(br[0] + br[2] / 2), int(br[1] + br[3] / 2))
+
+        rec = cv2.seamlessClone(
+            ft_masked.astype(np.uint8), f1np, mask_full, p=center,
+            flags=cv2.NORMAL_CLONE
+        )
+
     elif "min" in blending_type:
         rec = torch.minimum(f1, f2)
     elif "max" in blending_type:
@@ -407,18 +474,27 @@ def blend_frames(
     elif "tgt" in blending_type:
         rec = f2
     elif "seamless" in blending_type:
-        flags = cv2.MIXED_CLONE if "mix" in blending_type else cv2.NORMAL_CLONE
-
         # Invert source and target images.
         if "tgt" in blending_type:
             f1, f2 = f2, f1
 
-        f1np = f1.detach().cpu().numpy()
-        f1np = (f1np * 255.).astype(np.uint8)
-        f2np = f2.detach().cpu().numpy()
-        f2np = (f2np * 255.).astype(np.uint8)
+        flags = cv2.NORMAL_CLONE
+        if "mix" in blending_type:
+            flags = cv2.MIXED_CLONE
+        else:
+            f2 = (1 - t) * f1 + t * f2
 
-        landmarks = get_silhouette_lm(f1np, method="dlib").astype(np.int32)
+        f1np = f1.detach().cpu().numpy()
+        if f1np.max() <= 1.0:
+            f1np *= 255.
+        f1np = f1np.astype(np.uint8)
+
+        f2np = f2.detach().cpu().numpy()
+        if f2np.max() <= 1.0:
+            f2np *= 255
+        f2np = f2np.astype(np.uint8)
+
+        landmarks = get_silhouette_lm(f1np, method=landmark_detection).astype(np.int32)
 
         mask = np.zeros(f2.shape, dtype=np.uint8)
         mask = cv2.fillPoly(
